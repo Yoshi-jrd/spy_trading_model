@@ -1,0 +1,13 @@
+import csv
+from datetime import datetime
+
+# Function to append sentiment score to CSV
+def save_sentiment_score(score):
+    with open('sentiment_history.csv', mode='a', newline='') as file:
+        writer = csv.writer(file)
+        # Write the timestamp and sentiment score
+        writer.writerow([datetime.now().strftime('%Y-%m-%d %H:%M:%S'), score])
+
+# Example usage
+sentiment_score = -0.0321  # Retrieved from get_news_sentiment()
+save_sentiment_score(sentiment_score)
