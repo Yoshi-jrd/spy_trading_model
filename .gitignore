@@ -1,3 +1,5 @@
 venv/
 firebase_credentials.json
 dep_code_folder/
+sentiment_history.csv
+data/save_sentiment_score.csv
