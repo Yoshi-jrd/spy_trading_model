@@ -1,7 +1,7 @@
 import yfinance as yf
 import pandas as pd
 
-from indicator_calculator import calculate_indicators
+from data.indicator_calculator import calculate_indicators
 
 def load_spy_data_with_indicators(period="1mo", interval="1h"):
     spy = yf.Ticker("SPY")

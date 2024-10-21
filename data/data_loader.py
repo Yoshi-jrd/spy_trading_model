@@ -1,6 +1,6 @@
-from market_data_loader import load_spy_multi_timeframes, get_vix_futures, get_all_iv
-from economic_data_loader import load_economic_data
-from sentiment_data_loader import get_news_sentiment
+from data.market_data_loader import load_spy_multi_timeframes, get_vix_futures, get_all_iv
+from data.economic_data_loader import load_economic_data
+from data.sentiment_data_loader import get_news_sentiment
 import pandas as pd
 
 def load_data():

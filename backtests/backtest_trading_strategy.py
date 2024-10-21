@@ -1,154 +1,118 @@
-import numpy as np
-import pandas as pd
-from sklearn.utils import resample
-from datetime import timedelta
-import random
 import sys
 import os
+import numpy as np
+import pandas as pd
+
+# Add the root directory of your project to Python's path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from data.data_loader import load_data  # Use the data loader here
-import warnings
-warnings.filterwarnings("ignore")
-from strategies.simulate_trade import simulate_trade
-from run_models_on_timeframes import train_lstm, run_stacking_model, load_data_for_timeframes
-from strategies.apply_risk_management import apply_risk_management
-from summarize_backtest import summarize_backtest
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from xgboost import XGBClassifier
 
-# Synthetic Data Randomization
-def randomize_synthetic_data(X, y, num_samples=1000):
-    """
-    Generates randomized synthetic data to simulate different market conditions.
-    """
-    X_synthetic, y_synthetic = resample(X, y, replace=True, n_samples=num_samples, random_state=random.randint(0, 1000))
-    return X_synthetic, y_synthetic
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from data.data_loader import load_data
+from models.train_models import train_random_forest, train_xgboost, train_gradient_boosting, cross_validate_models, stack_predictions
+from models.stacking_and_lstm import train_lstm_model, combine_predictions
+from math import sqrt
 
-# --- Full Backtest Function ---
-def backtest_trading_strategy(X, y, base_models, lstm_model, spy_data, trade_type="credit_spread", trade_days=2, risk_management=None, evaluation_days=1):
-    """
-    Backtests an options trading strategy using a given model on historical and synthetic data.
-    """
+# --- Backtest Function ---
+def backtest_trading_strategy(X, y, spy_data, trade_type="credit_spread", trade_days=2, evaluation_days=1):
     trades = []
-
-    # Add a print statement to show the first few rows of spy_data
-    print("SPY Data Passed into Backtest (first 5 rows):")
-    print(spy_data.head())  
+    actual_prices = []  # To store actual price movements
+    predicted_prices = []  # To store predicted price movements
     
-    print("SPY Data Columns:")
-    print(spy_data.columns)
+    # Initialize base models
+    base_models = {
+        'RandomForest': train_random_forest(X, y),
+        'XGBoost': train_xgboost(X, y),
+        'GradientBoosting': train_gradient_boosting(X, y)
+    }
 
-    # Ensure 'Datetime' or 'Date' column exists in spy_data
-    if 'Datetime' in spy_data.columns:
-        dates = pd.to_datetime(spy_data['Datetime'])
-        print("Using 'Datetime' column for date parsing.")
-    elif 'Date' in spy_data.columns:
-        dates = pd.to_datetime(spy_data['Date'])
-        print("Using 'Date' column for date parsing.")
-    else:
-        print("Columns in spy_data:", spy_data.columns)  # This will print all available columns if no 'Datetime' or 'Date'
-        raise KeyError("'Datetime' or 'Date' column not found in spy_data")
+    # Cross-validate base models and get stacking predictions
+    rf_predictions, xgb_predictions, gb_predictions = cross_validate_models(X, y, base_models)
+
+    # Combine stacking predictions using adjustable weights
+    stacking_predictions = stack_predictions(rf_predictions[:, 1], xgb_predictions[:, 1], gb_predictions[:, 1], 
+                                             rf_weight=0.4, xgb_weight=0.3, gb_weight=0.3)
+
+    # Print shapes for diagnosis
+    print(f"Shape of stacking_predictions: {stacking_predictions.shape}")
+
+    # Train LSTM if needed (e.g., for 1h or 1d timeframes)
+    lstm_model = train_lstm_model(X.values.reshape((X.shape[0], 1, X.shape[1])), y)
     
-    spy_prices = spy_data['Close']  # Use 'Close' prices from the selected SPY timeframe data
+    # Generate LSTM predictions and ensure they are 1D
+    lstm_predictions = lstm_model.predict(X.values.reshape((X.shape[0], 1, X.shape[1])))
+    lstm_predictions = lstm_predictions.flatten()  # Ensure predictions are 1D
+    
+    # Generate combined price predictions using stacking and LSTM
+    combined_predictions = combine_predictions(stacking_predictions, lstm_predictions)
 
-    # Handle missing data by interpolation
-    spy_data.interpolate(method='time', inplace=True)
+    # Track exact prices and confidence intervals
+    for i in range(len(combined_predictions) - trade_days - evaluation_days):
+        open_price = spy_data['Close'].iloc[i + evaluation_days]
+        close_price = spy_data['Close'].iloc[i + evaluation_days + trade_days]
 
-    # Reshape data for LSTM if it's being used
-    X_reshaped = X.to_numpy().reshape((X.shape[0], 1, X.shape[1])) if lstm_model else X
+        # Predicted movement -> transform to price prediction
+        predicted_price = combined_predictions[i]
 
-    # Generate predictions from base models and LSTM
-    rf_predictions = base_models['RandomForest'].predict_proba(X)[:, 1].reshape(-1, 1)
-    xgb_predictions = base_models['XGBoost'].predict_proba(X)[:, 1].reshape(-1, 1)
-    gb_predictions = base_models['GradientBoosting'].predict_proba(X)[:, 1].reshape(-1, 1)
+        # Confidence interval (e.g., 80% confidence interval)
+        prediction_std = np.std([rf_predictions[i, 1], xgb_predictions[i, 1], gb_predictions[i, 1], lstm_predictions[i]])
+        lower_bound = predicted_price - 1.28 * prediction_std  # 80% confidence interval
+        upper_bound = predicted_price + 1.28 * prediction_std
 
-    lstm_predictions = lstm_model.predict(X_reshaped).flatten() if lstm_model else np.zeros(len(X))
+        # Store actual and predicted prices for error calculation
+        actual_prices.append(close_price)
+        predicted_prices.append(predicted_price)
 
-    # Combine predictions using a weighted approach
-    predictions = (0.4 * rf_predictions + 0.3 * xgb_predictions + 0.2 * gb_predictions + 0.1 * lstm_predictions)
-
-    for i in range(len(predictions) - trade_days - evaluation_days):
-        open_price = spy_prices.iloc[i + evaluation_days]
-        expiry_date = dates.iloc[i + evaluation_days] + timedelta(days=trade_days)
-
-        prediction_confidence = predictions[i]
-        prediction_error = abs(prediction_confidence - y.iloc[i])
-
-        # Simulate a trade based on the prediction
-        close_price = spy_prices.iloc[i + evaluation_days + trade_days]
-        trade_outcome, profit_loss, risk_reward = simulate_trade(open_price, close_price, trade_type, prediction_confidence)
-
-        # Apply risk management
-        if risk_management:
-            profit_loss, trade_outcome = apply_risk_management(profit_loss, risk_management)
-
-        # Collect trade details
+        # Store trade details
         trade = {
             'Trade Type': trade_type,
-            'Strike Price (Open)': open_price,
-            'Strike Price (Close)': close_price,
-            'Open Date': dates.iloc[i + evaluation_days],
-            'Expiry Date': expiry_date,
-            'Days Evaluated': evaluation_days,
-            'Risk/Reward': risk_reward,
-            'Profit/Loss': profit_loss,
             'SPY Price (Open)': open_price,
             'SPY Price (Close)': close_price,
-            'Successful Trade': trade_outcome,
-            'Prediction Confidence': prediction_confidence,
-            'Prediction Error': prediction_error
+            'Predicted SPY Price (2 days)': predicted_price,
+            '80% Confidence Lower Bound': lower_bound,
+            '80% Confidence Upper Bound': upper_bound,
+            'Trade Success': lower_bound <= close_price <= upper_bound
         }
         trades.append(trade)
 
-    # Create a summary dataframe
+    # Check the lengths of actual_prices and predicted_prices before calculating error
+    print(f"Final actual_prices length: {len(actual_prices)}")
+    print(f"Final predicted_prices length: {len(predicted_prices)}")
+
+    # Calculate error metrics (e.g., MAE and RMSE)
+    if len(actual_prices) == len(predicted_prices):
+        mae = mean_absolute_error(actual_prices, predicted_prices)
+        rmse = sqrt(mean_squared_error(actual_prices, predicted_prices))
+        print(f"Mean Absolute Error (MAE): {mae}")
+        print(f"Root Mean Squared Error (RMSE): {rmse}")
+    else:
+        print(f"Error: Mismatched lengths - actual_prices: {len(actual_prices)}, predicted_prices: {len(predicted_prices)}")
+    
+    # Create DataFrame of trades
     trades_df = pd.DataFrame(trades)
+    
     return trades_df
 
-
-# --- Run Full Backtest ---
 def run_backtest():
-    """
-    Main function to run backtest on historical and synthetic data.
-    """
-    timeframes = ['5m', '15m', '1h', '1d']
-    data_dict = load_data_for_timeframes(timeframes)
+    # Step 1: Load the data
+    data = load_data()
 
-    for timeframe, (X, y, spy_data) in data_dict.items():
-        print(f"Backtesting for {timeframe} timeframe...")
-        print(f"Spy data structure for {timeframe} timeframe:\n")
-        print(spy_data.head())  # Print first few rows to confirm structure
+    # Step 2: Extract X, y, and spy_data from the loaded data
+    # X is a feature matrix with technical indicators, sentiment, and closing prices
+    X = data['spy_data']['1h'][['MACD', 'RSI', '%K', '%D', 'ATR', 'PlusDI', 'MinusDI', 'EMA9', 'EMA21', 'MFI', 'Close']]
+    
+    # y represents the sentiment or target variable
+    spy_data = data['spy_data']['1h']  # SPY data for 1-hour timeframe
+    spy_data['Sentiment'] = (spy_data['EMA9'] > spy_data['EMA21']).astype(int)  # Binary sentiment calculation
+    y = spy_data['Sentiment']  # Use calculated sentiment as target variable
 
-        # Initialize base models
-        base_models = {
-            'RandomForest': RandomForestClassifier(n_estimators=100, random_state=42),
-            'XGBoost': XGBClassifier(use_label_encoder=False, eval_metric='mlogloss', verbosity=0),
-            'GradientBoosting': GradientBoostingClassifier(n_estimators=100, random_state=42)
-        }
+    # Step 3: Run the backtest
+    trades_df = backtest_trading_strategy(X, y, spy_data, 
+                                          trade_type="credit_spread", 
+                                          trade_days=2, 
+                                          evaluation_days=1)
 
-        # Randomize synthetic data
-        X_synthetic, y_synthetic = randomize_synthetic_data(X, y)
+    # Step 4: Print results (first few rows)
+    print(trades_df.head())
 
-        # Train base models
-        print(f"Training base models for {timeframe} timeframe...")
-        for model_name, model in base_models.items():
-            model.fit(X_synthetic, y_synthetic)  # Train each model on the synthetic data
-
-        # Train the LSTM model if the timeframe is 1h or 1d
-        lstm_model = None
-        if timeframe in ['1h', '1d']:
-            print(f"Training LSTM model for {timeframe} timeframe...")
-            lstm_model = train_lstm(X_synthetic, y_synthetic)
-
-        # Run backtest with risk management
-        risk_management = {'stop_loss': -0.1, 'take_profit': 0.2}  # Example risk management
-        trades_df = backtest_trading_strategy(X_synthetic, y_synthetic, base_models, lstm_model, spy_data, trade_days=2, risk_management=risk_management, evaluation_days=3)
-
-        # Summarize the backtest
-        summary_df = summarize_backtest(trades_df)
-        print(f"Summary for {timeframe}:\n{summary_df}\n")
-        print(f"Trade Details for {timeframe}:\n{trades_df.head()}\n")
-
-
-# --- Execute the backtest ---
 if __name__ == '__main__':
     run_backtest()
