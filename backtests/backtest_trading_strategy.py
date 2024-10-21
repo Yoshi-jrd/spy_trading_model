@@ -1,24 +1,32 @@
 import sys
 import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import pickle
 import numpy as np
 import pandas as pd
-
-# Add the root directory of your project to Python's path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-from data.data_loader import load_data
 from models.train_models import train_random_forest, train_xgboost, train_gradient_boosting, cross_validate_models, stack_predictions
 from models.stacking_and_lstm import train_lstm_model, combine_predictions
 from math import sqrt
 
+# Load the historical data from pickle file
+def load_historical_data():
+    file_path = os.path.join('local_data', 'historical_data.pickle')
+    if os.path.exists(file_path):
+        with open(file_path, 'rb') as f:
+            data = pickle.load(f)
+        return data
+    else:
+        print(f"No historical data found at {file_path}")
+        return None
+
 # --- Backtest Function ---
 def backtest_trading_strategy(X, y, spy_data, trade_type="credit_spread", trade_days=2, evaluation_days=1):
     trades = []
-    actual_prices = []  # To store actual price movements
-    predicted_prices = []  # To store predicted price movements
+    actual_prices = []
+    predicted_prices = []
     
-    # Initialize base models
+    # Initialize and train base models
     base_models = {
         'RandomForest': train_random_forest(X, y),
         'XGBoost': train_xgboost(X, y),
@@ -29,19 +37,16 @@ def backtest_trading_strategy(X, y, spy_data, trade_type="credit_spread", trade_
     rf_predictions, xgb_predictions, gb_predictions = cross_validate_models(X, y, base_models)
 
     # Combine stacking predictions using adjustable weights
-    stacking_predictions = stack_predictions(rf_predictions[:, 1], xgb_predictions[:, 1], gb_predictions[:, 1], 
+    stacking_predictions = stack_predictions(rf_predictions[:, 1], xgb_predictions[:, 1], gb_predictions[:, 1],
                                              rf_weight=0.4, xgb_weight=0.3, gb_weight=0.3)
-
-    # Print shapes for diagnosis
-    print(f"Shape of stacking_predictions: {stacking_predictions.shape}")
 
     # Train LSTM if needed (e.g., for 1h or 1d timeframes)
     lstm_model = train_lstm_model(X.values.reshape((X.shape[0], 1, X.shape[1])), y)
-    
+
     # Generate LSTM predictions and ensure they are 1D
     lstm_predictions = lstm_model.predict(X.values.reshape((X.shape[0], 1, X.shape[1])))
     lstm_predictions = lstm_predictions.flatten()  # Ensure predictions are 1D
-    
+
     # Generate combined price predictions using stacking and LSTM
     combined_predictions = combine_predictions(stacking_predictions, lstm_predictions)
 
@@ -93,13 +98,15 @@ def backtest_trading_strategy(X, y, spy_data, trade_type="credit_spread", trade_
     return trades_df
 
 def run_backtest():
-    # Step 1: Load the data
-    data = load_data()
+    # Step 1: Load the historical data from the pickle file
+    data = load_historical_data()
+    if data is None:
+        return
 
-    # Step 2: Extract X, y, and spy_data from the loaded data
+    # Step 2: Extract X, y, and spy_data from the loaded historical data
     # X is a feature matrix with technical indicators, sentiment, and closing prices
     X = data['spy_data']['1h'][['MACD', 'RSI', '%K', '%D', 'ATR', 'PlusDI', 'MinusDI', 'EMA9', 'EMA21', 'MFI', 'Close']]
-    
+
     # y represents the sentiment or target variable
     spy_data = data['spy_data']['1h']  # SPY data for 1-hour timeframe
     spy_data['Sentiment'] = (spy_data['EMA9'] > spy_data['EMA21']).astype(int)  # Binary sentiment calculation
