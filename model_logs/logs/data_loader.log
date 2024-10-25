@@ -1,0 +1,96 @@
+/usr/bin/python3: can't open file '/home/yoshi/Documents/spy_trading_model/spy_trading_model/data/data_loader.py': [Errno 2] No such file or directory
+/usr/bin/python3: can't open file '/home/yoshi/Documents/spy_trading_model/spy_trading_model/data/data_loader.py': [Errno 2] No such file or directory
+/usr/bin/python3: can't open file '/data/data_loader.py': [Errno 2] No such file or directory
+/usr/bin/python3: can't open file '/data/data_loader.py': [Errno 2] No such file or directory
+Starting data import...
+
+--- Imported Data Preview ---
+SPY data keys (timeframes): dict_keys(['5m', '15m', '1h', '1d'])
+VIX data columns: Index(['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Dividends',
+       'Stock Splits'],
+      dtype='object')
+IV data columns: Index(['expiry', 'avg_iv_calls', 'avg_iv_puts', 'avg_iv'], dtype='object')
+GDP data shape: (314,)
+CPI data shape: (933,)
+Sentiment data: 0.028124999999999997
+Articles: {'status': 'ok', 'totalResults': 8, 'articles': [{'source': {'id': None, 'name': 'Yahoo Entertainment'}, 'author': 'TipRanks', 'title': 'MicroStrategy Is a Strategic Buy to Capitalize on Bitcoin’s Outperformance', 'description': 'MicroStrategy (MSTR) is a tech company that has spent the last few years accumulating Bitcoin (BTC-USD) on its balance sheet through a well-executed...', 'url': 'https://finance.yahoo.com/news/microstrategy-strategic-buy-capitalize-bitcoin-174706028.html', 'urlToImage': 'https://s.yimg.com/cv/apiv2/social/images/yahoo_default_logo.png', 'publishedAt': '2024-10-09T17:47:06Z', 'content': 'MicroStrategy (MSTR) is a tech company that has spent the last few years accumulating Bitcoin (BTC-USD) on its balance sheet through a well-executed financing strategy. This approach supports my bull… [+5700 chars]'}, {'source': {'id': None, 'name': 'Deadline'}, 'author': 'anthonypauldalessandro', 'title': 'Sony Shocker: Tony Vinciquerra Stepping Down As CEO; Ravi Ahuja To Succeed Him', 'description': 'In a surprise executive shuffle, Sony Pictures Entertainment Chairman and CEO Tony Vinciquerra is stepping down from his CEO role, effective Jan. 2, 2025. SPE’s current Chairman of Global Television Studios and President and COO, Ravi Ahuja, will be taking th…', 'url': 'http://deadline.com/2024/09/sony-tony-vinciquerra-ravi-ahuja-1236103582/', 'urlToImage': 'https://deadline.com/wp-content/uploads/2024/09/Tony-Vinciquerra-and-Ravi-Ahuja.jpg?w=1024', 'publishedAt': '2024-09-30T23:00:03Z', 'content': 'In a surprise executive shuffle, Sony Pictures Entertainment Chairman and CEO Tony Vinciquerra is stepping down from his CEO role, effective Jan. 2, 2025. SPE’s current Chairman of Global Television … [+10189 chars]'}, {'source': {'id': None, 'name': 'Investing.com'}, 'author': 'Investing.com', 'title': 'ServiceNow stock target increased, holds buy on strong growth outlook', 'description': 'ServiceNow stock target increased, holds buy on strong growth outlook', 'url': 'https://www.investing.com/news/company-news/servicenow-stock-target-increased-holds-buy-on-strong-growth-outlook-93CH-3680418', 'urlToImage': 'https://i-invdn-com.investing.com/redesign/images/seo/investing_300X300.png', 'publishedAt': '2024-10-24T12:07:03Z', 'content': "On Thursday, Stifel increased the stock price target for ServiceNow (NYSE: NYSE:NOW) to $990 from $900, while reiterating a Buy rating on the stock. The firm's analyst cited ServiceNow's third-quarte… [+3967 chars]"}, {'source': {'id': None, 'name': 'Eurogamer.net'}, 'author': 'Chris Tapsell', 'title': "Saving Cyberpunk 2077: How CD Projekt Red recovered from one of video games' most disastrous launches", 'description': "Cyberpunk 2077 went from one of the most anticipated games of all time to an infamous disaster. This is how CD Projekt Red's developers brought it back to life.", 'url': 'https://www.eurogamer.net/saving-cyberpunk-2077-how-cd-projekt-red-recovered-from-one-of-video-games-most-disastrous-launches', 'urlToImage': 'https://assetsio.gnwcdn.com/EG24_CyberpunkLongread_MAIN_AW.jpg?width=1200&height=630&fit=crop&enable=upscale&auto=webp', 'publishedAt': '2024-10-01T10:27:03Z', 'content': '"Beep."\r\nOn 10th January, 2018, Marcin Momot, CD Projekt Red\'s global community lead, fired up the social media engines and hit "Tweet". This was the first tease of CDPR\'s marketing push for Cyberpun… [+62308 chars]'}, {'source': {'id': 'financial-post', 'name': 'Financial Post'}, 'author': 'Bloomberg News', 'title': 'Treasuries Hold Losses Following Global Selloff: Markets Wrap', 'description': 'Bonds maintained losses and US stocks struggled as traders mulled prospects for a slower pace of Federal Reserve rate cuts. Asian shares looked set for a mixed open.', 'url': 'https://financialpost.com/pmn/business-pmn/treasuries-hold-losses-following-global-selloff-markets-wrap', 'urlToImage': 'https://smartcdn.gprod.postmedia.digital/financialpost/wp-content/uploads/2024/10/latest-us-bond-selloff-echoes-the-one-after-1995-fed-cut-tw.jpg', 'publishedAt': '2024-10-22T22:51:14Z', 'content': 'Bonds maintained losses and US stocks struggled as traders mulled prospects for a slower pace of Federal Reserve rate cuts. Asian shares looked set for a mixed open.\r\nAuthor of the article:\r\n60a4ca6)… [+9289 chars]'}, {'source': {'id': None, 'name': 'Americanthinker.com'}, 'author': None, 'title': 'FBI sneaks in revision to its 2022 crime statistics, to show that actually, violent crime is up 4.5%, not down 3.5%', 'description': 'Now that election time is on, is there any such thing as an honest statistic from the Biden-Harris administration?\r\n\r\nThe indefatigable John Lott at RealClearInvestigations has ratted out another one:\r\n\r\n\r\nWhen the FBI originally released the “...', 'url': 'https://www.americanthinker.com/blog/2024/10/fbi_sneaks_in_revision_to_its_2022_crime_statistics_to_show_that_actually_violent_crime_is_up_4_5_not_down_3_5.html', 'urlToImage': 'https://images.americanthinker.com/mt/mtixrlzqx60hjznbk7fp_800.JPG', 'publishedAt': '2024-10-16T04:00:00Z', 'content': 'Now that election time is on, is there any such thing as an honest statistic from the Biden-Harris administration?\r\nThe indefatigable John Lott at RealClearInvestigations has ratted out another one:\r… [+7518 chars]'}, {'source': {'id': None, 'name': 'Tistory.com'}, 'author': 'T.B', 'title': '김건희 게이트(Rolex Gate) 189 (Trump Stakeholder)', 'description': 'An @EdConwaySky report found luxury British cars are still making their way into #RussiaHave @jreynoldsMP and the government looked at tightening the rules?#KayBurley SS pic.twitter.com/zDQojkB3jo— Kay Burley (@KayBurley) October 10, 2024\xa0Ukrainian President …', 'url': 'https://ryueyes11.tistory.com/511075', 'urlToImage': 'https://img1.daumcdn.net/thumb/R800x0/?scode=mtistory2&fname=https%3A%2F%2Fblog.kakaocdn.net%2Fdn%2Fbq4Lqm%2FbtsJ2YqIEtM%2Fe9DX7kwKZtpn1eq9FwEli0%2Fimg.jpg', 'publishedAt': '2024-10-11T10:55:51Z', 'content': 'An @EdConwaySky report found luxury British cars are still making their way into #Russia\r\nHave @jreynoldsMP and the government looked at tightening the rules?#KayBurley SS pic.twitter.com/zDQojkB3jo\r… [+16799 chars]'}, {'source': {'id': None, 'name': 'Investopedia'}, 'author': 'Cedric Thompson', 'title': 'The Best Performing S&P 500 Stocks Over the Past 30 Years Might Surprise You', 'description': 'A performance analysis of the current constituents of the S&P 500 Index Over the Last 30 Years ending September 2024', 'url': 'https://www.investopedia.com/best-performing-s-and-p-500-stocks-8720206', 'urlToImage': 'https://www.investopedia.com/thmb/IMZiuhkN0Tr2s8FygcixCdEAgkI=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/GettyImages-2166298802-3a703379abf4450c8cc529726a271890.jpg', 'publishedAt': '2024-10-03T16:01:59Z', 'content': "When analyzing the top-performing stocks over the past three decades, it's striking that the leaders are not all from the technology sector. While tech powerhouses such as NVIDIA Corp. (NVDA) and App… [+29053 chars]"}]}
+
+Cleaning SPY data for 5m timeframe
+
+Cleaning SPY data for 15m timeframe
+
+Cleaning SPY data for 1h timeframe
+
+Cleaning SPY data for 1d timeframe
+
+Cleaning VIX data
+
+Cleaning IV data
+
+Cleaning GDP and CPI data
+
+Cleaning Sentiment data
+
+Cleaning Articles data
+
+--- Cleaned Data Summary ---
+spy_data (5m): (1717, 29)
+spy_data (15m): (573, 29)
+spy_data (1h): (886, 29)
+spy_data (1d): (253, 29)
+vix_data: (23, 8)
+iv_data: (28, 4)
+gdp_data: (314, 2)
+cpi_data: (933, 2)
+sentiment_data: (1, 2)
+articles: (8, 9)
+
+Existing data loaded from local_data/historical_data.pickle.
+
+Data saved to local_data/historical_data.pickle.
+Starting data import...
+
+--- Imported Data Preview ---
+SPY data keys (timeframes): dict_keys(['5m', '15m', '1h', '1d'])
+VIX data columns: Index(['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Dividends',
+       'Stock Splits'],
+      dtype='object')
+IV data columns: Index(['expiry', 'avg_iv_calls', 'avg_iv_puts', 'avg_iv'], dtype='object')
+GDP data shape: (314,)
+CPI data shape: (933,)
+Sentiment data: 0.028124999999999997
+Articles: {'status': 'ok', 'totalResults': 8, 'articles': [{'source': {'id': None, 'name': 'Yahoo Entertainment'}, 'author': 'TipRanks', 'title': 'MicroStrategy Is a Strategic Buy to Capitalize on Bitcoin’s Outperformance', 'description': 'MicroStrategy (MSTR) is a tech company that has spent the last few years accumulating Bitcoin (BTC-USD) on its balance sheet through a well-executed...', 'url': 'https://finance.yahoo.com/news/microstrategy-strategic-buy-capitalize-bitcoin-174706028.html', 'urlToImage': 'https://s.yimg.com/cv/apiv2/social/images/yahoo_default_logo.png', 'publishedAt': '2024-10-09T17:47:06Z', 'content': 'MicroStrategy (MSTR) is a tech company that has spent the last few years accumulating Bitcoin (BTC-USD) on its balance sheet through a well-executed financing strategy. This approach supports my bull… [+5700 chars]'}, {'source': {'id': None, 'name': 'Deadline'}, 'author': 'anthonypauldalessandro', 'title': 'Sony Shocker: Tony Vinciquerra Stepping Down As CEO; Ravi Ahuja To Succeed Him', 'description': 'In a surprise executive shuffle, Sony Pictures Entertainment Chairman and CEO Tony Vinciquerra is stepping down from his CEO role, effective Jan. 2, 2025. SPE’s current Chairman of Global Television Studios and President and COO, Ravi Ahuja, will be taking th…', 'url': 'http://deadline.com/2024/09/sony-tony-vinciquerra-ravi-ahuja-1236103582/', 'urlToImage': 'https://deadline.com/wp-content/uploads/2024/09/Tony-Vinciquerra-and-Ravi-Ahuja.jpg?w=1024', 'publishedAt': '2024-09-30T23:00:03Z', 'content': 'In a surprise executive shuffle, Sony Pictures Entertainment Chairman and CEO Tony Vinciquerra is stepping down from his CEO role, effective Jan. 2, 2025. SPE’s current Chairman of Global Television … [+10189 chars]'}, {'source': {'id': None, 'name': 'Investing.com'}, 'author': 'Investing.com', 'title': 'ServiceNow stock target increased, holds buy on strong growth outlook', 'description': 'ServiceNow stock target increased, holds buy on strong growth outlook', 'url': 'https://www.investing.com/news/company-news/servicenow-stock-target-increased-holds-buy-on-strong-growth-outlook-93CH-3680418', 'urlToImage': 'https://i-invdn-com.investing.com/redesign/images/seo/investing_300X300.png', 'publishedAt': '2024-10-24T12:07:03Z', 'content': "On Thursday, Stifel increased the stock price target for ServiceNow (NYSE: NYSE:NOW) to $990 from $900, while reiterating a Buy rating on the stock. The firm's analyst cited ServiceNow's third-quarte… [+3967 chars]"}, {'source': {'id': None, 'name': 'Eurogamer.net'}, 'author': 'Chris Tapsell', 'title': "Saving Cyberpunk 2077: How CD Projekt Red recovered from one of video games' most disastrous launches", 'description': "Cyberpunk 2077 went from one of the most anticipated games of all time to an infamous disaster. This is how CD Projekt Red's developers brought it back to life.", 'url': 'https://www.eurogamer.net/saving-cyberpunk-2077-how-cd-projekt-red-recovered-from-one-of-video-games-most-disastrous-launches', 'urlToImage': 'https://assetsio.gnwcdn.com/EG24_CyberpunkLongread_MAIN_AW.jpg?width=1200&height=630&fit=crop&enable=upscale&auto=webp', 'publishedAt': '2024-10-01T10:27:03Z', 'content': '"Beep."\r\nOn 10th January, 2018, Marcin Momot, CD Projekt Red\'s global community lead, fired up the social media engines and hit "Tweet". This was the first tease of CDPR\'s marketing push for Cyberpun… [+62308 chars]'}, {'source': {'id': 'financial-post', 'name': 'Financial Post'}, 'author': 'Bloomberg News', 'title': 'Treasuries Hold Losses Following Global Selloff: Markets Wrap', 'description': 'Bonds maintained losses and US stocks struggled as traders mulled prospects for a slower pace of Federal Reserve rate cuts. Asian shares looked set for a mixed open.', 'url': 'https://financialpost.com/pmn/business-pmn/treasuries-hold-losses-following-global-selloff-markets-wrap', 'urlToImage': 'https://smartcdn.gprod.postmedia.digital/financialpost/wp-content/uploads/2024/10/latest-us-bond-selloff-echoes-the-one-after-1995-fed-cut-tw.jpg', 'publishedAt': '2024-10-22T22:51:14Z', 'content': 'Bonds maintained losses and US stocks struggled as traders mulled prospects for a slower pace of Federal Reserve rate cuts. Asian shares looked set for a mixed open.\r\nAuthor of the article:\r\n60a4ca6)… [+9289 chars]'}, {'source': {'id': None, 'name': 'Americanthinker.com'}, 'author': None, 'title': 'FBI sneaks in revision to its 2022 crime statistics, to show that actually, violent crime is up 4.5%, not down 3.5%', 'description': 'Now that election time is on, is there any such thing as an honest statistic from the Biden-Harris administration?\r\n\r\nThe indefatigable John Lott at RealClearInvestigations has ratted out another one:\r\n\r\n\r\nWhen the FBI originally released the “...', 'url': 'https://www.americanthinker.com/blog/2024/10/fbi_sneaks_in_revision_to_its_2022_crime_statistics_to_show_that_actually_violent_crime_is_up_4_5_not_down_3_5.html', 'urlToImage': 'https://images.americanthinker.com/mt/mtixrlzqx60hjznbk7fp_800.JPG', 'publishedAt': '2024-10-16T04:00:00Z', 'content': 'Now that election time is on, is there any such thing as an honest statistic from the Biden-Harris administration?\r\nThe indefatigable John Lott at RealClearInvestigations has ratted out another one:\r… [+7518 chars]'}, {'source': {'id': None, 'name': 'Tistory.com'}, 'author': 'T.B', 'title': '김건희 게이트(Rolex Gate) 189 (Trump Stakeholder)', 'description': 'An @EdConwaySky report found luxury British cars are still making their way into #RussiaHave @jreynoldsMP and the government looked at tightening the rules?#KayBurley SS pic.twitter.com/zDQojkB3jo— Kay Burley (@KayBurley) October 10, 2024\xa0Ukrainian President …', 'url': 'https://ryueyes11.tistory.com/511075', 'urlToImage': 'https://img1.daumcdn.net/thumb/R800x0/?scode=mtistory2&fname=https%3A%2F%2Fblog.kakaocdn.net%2Fdn%2Fbq4Lqm%2FbtsJ2YqIEtM%2Fe9DX7kwKZtpn1eq9FwEli0%2Fimg.jpg', 'publishedAt': '2024-10-11T10:55:51Z', 'content': 'An @EdConwaySky report found luxury British cars are still making their way into #Russia\r\nHave @jreynoldsMP and the government looked at tightening the rules?#KayBurley SS pic.twitter.com/zDQojkB3jo\r… [+16799 chars]'}, {'source': {'id': None, 'name': 'Investopedia'}, 'author': 'Cedric Thompson', 'title': 'The Best Performing S&P 500 Stocks Over the Past 30 Years Might Surprise You', 'description': 'A performance analysis of the current constituents of the S&P 500 Index Over the Last 30 Years ending September 2024', 'url': 'https://www.investopedia.com/best-performing-s-and-p-500-stocks-8720206', 'urlToImage': 'https://www.investopedia.com/thmb/IMZiuhkN0Tr2s8FygcixCdEAgkI=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/GettyImages-2166298802-3a703379abf4450c8cc529726a271890.jpg', 'publishedAt': '2024-10-03T16:01:59Z', 'content': "When analyzing the top-performing stocks over the past three decades, it's striking that the leaders are not all from the technology sector. While tech powerhouses such as NVIDIA Corp. (NVDA) and App… [+29053 chars]"}]}
+
+Cleaning SPY data for 5m timeframe
+
+Cleaning SPY data for 15m timeframe
+
+Cleaning SPY data for 1h timeframe
+
+Cleaning SPY data for 1d timeframe
+
+Cleaning VIX data
+
+Cleaning IV data
+
+Cleaning GDP and CPI data
+
+Cleaning Sentiment data
+
+Cleaning Articles data
+
+--- Cleaned Data Summary ---
+spy_data (5m): (1717, 29)
+spy_data (15m): (573, 29)
+spy_data (1h): (886, 29)
+spy_data (1d): (253, 29)
+vix_data: (23, 8)
+iv_data: (28, 4)
+gdp_data: (314, 2)
+cpi_data: (933, 2)
+sentiment_data: (1, 2)
+articles: (8, 9)
+
+Existing data loaded from local_data/historical_data.pickle.
+
+Data saved to local_data/historical_data.pickle.
