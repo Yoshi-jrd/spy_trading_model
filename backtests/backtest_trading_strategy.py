@@ -5,9 +5,8 @@ import pickle
 import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-from models.train_models import train_random_forest, train_xgboost, train_gradient_boosting, cross_validate_models, stack_predictions
-from models.stacking_and_lstm import train_lstm_model, combine_predictions
 from math import sqrt
+from models.train_models import train_and_save_models, cross_validate_models, stack_predictions, load_model_sklearn, load_keras_model, evaluate_model
 
 # Load the historical data from pickle file
 def load_historical_data():
@@ -26,29 +25,23 @@ def backtest_trading_strategy(X, y, spy_data, trade_type="credit_spread", trade_
     actual_prices = []
     predicted_prices = []
     
-    # Initialize and train base models
-    base_models = {
-        'RandomForest': train_random_forest(X, y),
-        'XGBoost': train_xgboost(X, y),
-        'GradientBoosting': train_gradient_boosting(X, y)
-    }
+    # Step 1: Train or load base models
+    rf_model, xgb_model, gb_model, lstm_model = train_and_save_models(X, y)
 
-    # Cross-validate base models and get stacking predictions
-    rf_predictions, xgb_predictions, gb_predictions = cross_validate_models(X, y, base_models)
+    # Step 2: Cross-validate base models and get stacking predictions
+    base_models = {'RandomForest': rf_model, 'XGBoost': xgb_model, 'GradientBoosting': gb_model}
+    rf_predictions, xgb_predictions, gb_oof_predictions = cross_validate_models(X, y, base_models)
 
-    # Combine stacking predictions using adjustable weights
-    stacking_predictions = stack_predictions(rf_predictions[:, 1], xgb_predictions[:, 1], gb_predictions[:, 1],
+    # Step 3: Combine stacking predictions using adjustable weights
+    stacking_predictions = stack_predictions(rf_predictions, xgb_predictions, gb_oof_predictions,
                                              rf_weight=0.4, xgb_weight=0.3, gb_weight=0.3)
 
-    # Train LSTM if needed (e.g., for 1h or 1d timeframes)
-    lstm_model = train_lstm_model(X.values.reshape((X.shape[0], 1, X.shape[1])), y)
-
-    # Generate LSTM predictions and ensure they are 1D
+    # Step 4: Generate LSTM predictions and ensure they are 1D
     lstm_predictions = lstm_model.predict(X.values.reshape((X.shape[0], 1, X.shape[1])))
     lstm_predictions = lstm_predictions.flatten()  # Ensure predictions are 1D
 
-    # Generate combined price predictions using stacking and LSTM
-    combined_predictions = combine_predictions(stacking_predictions, lstm_predictions)
+    # Step 5: Combine LSTM and stacking predictions
+    combined_predictions = stack_predictions(stacking_predictions, lstm_predictions, rf_weight=0.5, xgb_weight=0.25, gb_weight=0.25)
 
     # Track exact prices and confidence intervals
     for i in range(len(combined_predictions) - trade_days - evaluation_days):
@@ -59,7 +52,7 @@ def backtest_trading_strategy(X, y, spy_data, trade_type="credit_spread", trade_
         predicted_price = combined_predictions[i]
 
         # Confidence interval (e.g., 80% confidence interval)
-        prediction_std = np.std([rf_predictions[i, 1], xgb_predictions[i, 1], gb_predictions[i, 1], lstm_predictions[i]])
+        prediction_std = np.std([rf_predictions[i], xgb_predictions[i], gb_oof_predictions[i], lstm_predictions[i]])
         lower_bound = predicted_price - 1.28 * prediction_std  # 80% confidence interval
         upper_bound = predicted_price + 1.28 * prediction_std
 

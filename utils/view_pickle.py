@@ -17,9 +17,9 @@ def load_pickle_file(file_path):
         print(f"No file found at {file_path}")
         return None
 
-def display_data(data, rows=5):
+def display_head_and_tail(data, rows=5):
     """
-    Display the actual data from the pickle file, showing the first few rows.
+    Display the head and tail of each DataFrame stored in the pickle file.
     """
     if data is not None:
         for key, value in data.items():
@@ -27,19 +27,21 @@ def display_data(data, rows=5):
             if isinstance(value, dict):
                 for sub_key, sub_value in value.items():
                     print(f"  Subkey: {sub_key}")
-                    if isinstance(sub_value, pd.DataFrame) or isinstance(sub_value, pd.Series):
-                        print(sub_value.head(rows))  # Print the first few rows of the DataFrame/Series
+                    if isinstance(sub_value, pd.DataFrame):
+                        print(f"  Head of {sub_key}:\n{sub_value.head(rows)}")
+                        print(f"  Tail of {sub_key}:\n{sub_value.tail(rows)}")
                     else:
-                        print(f"  {type(sub_value)} - Not a DataFrame/Series")
+                        print(f"  {type(sub_value)} - Not a DataFrame")
             else:
-                if isinstance(value, pd.DataFrame) or isinstance(value, pd.Series):
-                    print(value.head(rows))  # Print the first few rows of the DataFrame/Series
+                if isinstance(value, pd.DataFrame):
+                    print(f"Head of {key}:\n{value.head(rows)}")
+                    print(f"Tail of {key}:\n{value.tail(rows)}")
                 else:
-                    print(f"{type(value)} - Not a DataFrame/Series")
+                    print(f"{type(value)} - Not a DataFrame")
     else:
         print("No data to display.")
 
 if __name__ == '__main__':
     # Load and display the pickle file contents
     data = load_pickle_file(file_path)
-    display_data(data, rows=5)  # Modify 'rows' to display more or fewer rows
+    display_head_and_tail(data, rows=5)  # Modify 'rows' to display more or fewer rows

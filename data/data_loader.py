@@ -1,113 +1,181 @@
 import os
 import sys
-import pickle  # Import pickle for saving data
+import pickle
+from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import pandas as pd
+from sklearn.model_selection import train_test_split
 from data.market_data_loader import load_spy_multi_timeframes, get_vix_futures, get_all_iv
 from data.economic_data_loader import load_economic_data
 from data.sentiment_data_loader import get_news_sentiment
 
-def preprocess_data(df, name="data"):
+def import_data():
     """
-    Clean and preprocess the data by handling NaN values and ensuring the right shape.
+    Import data from different sources: SPY, VIX, IV, GDP, CPI, Sentiment, and Articles.
     """
-    # Fill NaN values and drop any remaining NaNs
-    df = df.ffill().dropna()
+    print("Starting data import...")
 
-    # Check for any remaining NaN values
-    if df.isna().sum().sum() == 0:
-        print(f"{name} is clean with shape {df.shape}")
-    else:
-        print(f"Warning: {name} still contains NaNs after preprocessing.")
-
-    return df
-
-def load_cleaned_data():
-    """
-    Load and clean all the necessary data for the model.
-    """
-    # Load data using your existing functions
     spy_data = load_spy_multi_timeframes()
     vix_data = get_vix_futures()
     iv_data = get_all_iv()
     gdp_data, cpi_data = load_economic_data()
     sentiment_data, articles = get_news_sentiment()
 
-    # Preprocess each DataFrame
-    cleaned_data = {
-        'spy_data': {tf: preprocess_data(spy_data[tf], f"SPY {tf}") for tf in spy_data},
-        'vix_data': preprocess_data(vix_data, "VIX"),
-        'iv_data': preprocess_data(iv_data, "IV"),
-        'gdp_data': preprocess_data(gdp_data, "GDP"),
-        'cpi_data': preprocess_data(cpi_data, "CPI"),
-        'sentiment_data': sentiment_data,  # Assuming sentiment_data is not a DataFrame
-        'articles': articles  # Assuming articles are not a DataFrame
+    print("\n--- Imported Data Preview ---")
+    print("SPY data keys (timeframes):", spy_data.keys())
+    print("VIX data columns:", vix_data.columns)
+    print("IV data columns:", iv_data.columns)
+    print("GDP data shape:", gdp_data.shape)
+    print("CPI data shape:", cpi_data.shape)
+    print("Sentiment data:", sentiment_data)
+    print("Articles:", articles)
+
+    return spy_data, vix_data, iv_data, gdp_data, cpi_data, sentiment_data, articles
+
+def ensure_datetime(df, possible_col_names):
+    """
+    Ensure that the DataFrame has a consistent 'datetime' column.
+    """
+    found_col = None
+    for col_name in possible_col_names:
+        if col_name in df.columns:
+            found_col = col_name
+            break
+
+    if found_col:
+        df['datetime'] = pd.to_datetime(df[found_col], errors='coerce')
+        df.drop(columns=[found_col], inplace=True)
+    else:
+        print(f"Available columns: {df.columns}")
+        raise ValueError(f"DataFrame does not contain any of the columns {possible_col_names} for datetime")
+
+    df['datetime'] = df['datetime'].ffill().bfill().fillna(pd.Timestamp.now())
+    return df
+
+def clean_and_normalize(spy_data, vix_data, iv_data, gdp_data, cpi_data, sentiment_data, articles):
+    """
+    Clean and normalize data, ensuring:
+    1. Consistent 'datetime' column.
+    2. No missing or invalid values (NaN, NaT).
+    """
+    spy_data_cleaned = {}
+    for tf, df in spy_data.items():
+        print(f"\nCleaning SPY data for {tf} timeframe")
+        if tf == '1d':
+            df = ensure_datetime(df, ['Date', 'Datetime'])
+        else:
+            df = ensure_datetime(df, ['Datetime'])
+        
+        df = df.ffill().bfill()
+        spy_data_cleaned[tf] = df
+
+    print("\nCleaning VIX data")
+    vix_data = ensure_datetime(vix_data, ['Date', 'Datetime'])
+    vix_data = vix_data.ffill()
+
+    print("\nCleaning IV data")
+    iv_data = ensure_datetime(iv_data, ['expiry'])
+    iv_data = iv_data.ffill()
+
+    print("\nCleaning GDP and CPI data")
+    gdp_data = pd.DataFrame(gdp_data).reset_index()
+    gdp_data.columns = ['datetime', 'value']
+    cpi_data = pd.DataFrame(cpi_data).reset_index()
+    cpi_data.columns = ['datetime', 'value']
+    gdp_data = gdp_data.ffill().bfill()
+    cpi_data = cpi_data.ffill().bfill()
+
+    print("\nCleaning Sentiment data")
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    sentiment_data_cleaned = pd.DataFrame({'datetime': [current_date], 'sentiment_value': [sentiment_data]})
+
+    print("\nCleaning Articles data")
+    articles_cleaned = pd.DataFrame(articles.get('articles', []))
+    
+    if 'publishedAt' in articles_cleaned.columns:
+        articles_cleaned['datetime'] = pd.to_datetime(articles_cleaned['publishedAt'], errors='coerce')
+        articles_cleaned['datetime'] = articles_cleaned['datetime'].ffill().bfill()
+    else:
+        articles_cleaned['datetime'] = current_date
+
+    datasets = {
+        'spy_data': spy_data_cleaned,
+        'vix_data': vix_data,
+        'iv_data': iv_data,
+        'gdp_data': gdp_data,
+        'cpi_data': cpi_data,
+        'sentiment_data': sentiment_data_cleaned,
+        'articles': articles_cleaned
     }
 
-    # Print summary for review
-    print("Data cleaning complete. Here's a summary of the cleaned data:")
-    for key, value in cleaned_data.items():
-        if isinstance(value, dict):
-            for sub_key, sub_value in value.items():
-                if isinstance(sub_value, pd.DataFrame) or isinstance(sub_value, pd.Series):
-                    print(f"{key} - {sub_key}: {sub_value.shape}")
-                else:
-                    print(f"{key} - {sub_key}: {type(sub_value)}")
-        elif isinstance(value, pd.DataFrame) or isinstance(value, pd.Series):
-            print(f"{key}: {value.shape}")
+    print("\n--- Cleaned Data Summary ---")
+    for key, data in datasets.items():
+        if isinstance(data, dict):
+            for sub_key, sub_data in data.items():
+                print(f"{key} ({sub_key}): {sub_data.shape}")
         else:
-            print(f"{key}: {type(value)}")
-
-    return cleaned_data
-
-from data.data_loader import load_cleaned_data
-# from utils.data_storage import append_data_to_pickle, upload_to_firebase  # Commented out for now
-
-def append_data_to_pickle(new_data):
-    """
-    Save the cleaned data to a pickle file.
-    """
-    file_path = os.path.join('local_data', "historical_data.pickle")
-
-    # Load the existing data if the pickle file exists
-    if os.path.exists(file_path):
-        with open(file_path, 'rb') as f:
-            existing_data = pickle.load(f)
-        print(f"Loaded existing historical data from {file_path}")
-    else:
-        existing_data = {}
-        print(f"No existing data found, creating a new file.")
-
-    # Append only new data
-    for key, value in new_data.items():
-        if key in existing_data:
-            if isinstance(existing_data[key], pd.DataFrame):
-                combined_data = pd.concat([existing_data[key], value])
-                existing_data[key] = combined_data.drop_duplicates()  # Ensures only unique rows remain
-            else:
-                print(f"Warning: {key} is not a DataFrame.")
-        else:
-            existing_data[key] = value
-
-    # Save the updated data back to the pickle file
-    with open(file_path, 'wb') as f:
-        pickle.dump(existing_data, f)
-    print(f"Appended new historical data and saved to {file_path}")
-
-def review_data():
-    """
-    Review cleaned data before passing it to data storage.
-    """
-    cleaned_data = load_cleaned_data()  # Load and clean the data
+            print(f"{key}: {data.shape}")
     
-    # Prompt for review confirmation
-    proceed = input("Do you want to proceed with saving this data? (y/n): ")
-    if proceed.lower() == 'y':
-        append_data_to_pickle(cleaned_data)  # Save the cleaned data
-        local_file_path = os.path.join('local_data', "historical_data.pickle")
-        # upload_to_firebase(local_file_path, "data/historical_data.pickle")  # Upload the pickle file (commented out for now)
-    else:
-        print("Data saving and uploading aborted.")
+    return datasets
 
-if __name__ == '__main__':
-    review_data()
+def load_existing_data(filename='local_data/historical_data.pickle'):
+    """
+    Load existing historical data from a pickle file.
+    """
+    if os.path.exists(filename):
+        with open(filename, 'rb') as f:
+            existing_data = pickle.load(f)
+        print(f"\nExisting data loaded from {filename}.")
+        return existing_data
+    else:
+        print(f"{filename} not found. No existing data to load.")
+        return None
+
+def append_new_data(existing_data, new_data):
+    """
+    Append new data to the existing data. Only append data that doesn't already exist.
+    """
+    for key, df_new in new_data.items():
+        if isinstance(df_new, dict):
+            for sub_key, sub_df_new in df_new.items():
+                if key in existing_data and sub_key in existing_data[key]:
+                    sub_df_existing = existing_data[key][sub_key]
+                    existing_data[key][sub_key] = pd.concat([sub_df_existing, sub_df_new]).drop_duplicates(subset='datetime')
+                else:
+                    if key not in existing_data:
+                        existing_data[key] = {}
+                    existing_data[key][sub_key] = sub_df_new
+        else:
+            if key in existing_data:
+                existing_data[key] = pd.concat([existing_data[key], df_new]).drop_duplicates(subset='datetime')
+            else:
+                existing_data[key] = df_new
+    return existing_data
+
+def save_to_pickle(data, filename='local_data/historical_data.pickle'):
+    """
+    Save the updated data to the pickle file.
+    """
+    with open(filename, 'wb') as f:
+        pickle.dump(data, f)
+    print(f"\nData saved to {filename}.")
+
+if __name__ == "__main__":
+    # Step 1: Import the data
+    spy_data, vix_data, iv_data, gdp_data, cpi_data, sentiment_data, articles = import_data()
+
+    # Step 2: Clean and normalize the data
+    cleaned_data = clean_and_normalize(spy_data, vix_data, iv_data, gdp_data, cpi_data, sentiment_data, articles)
+
+    # Step 3: Load existing data if available
+    existing_data = load_existing_data()
+
+    if existing_data:
+        # Step 4: Append the new data to the existing data
+        updated_data = append_new_data(existing_data, cleaned_data)
+    else:
+        # If no existing data, use the new data directly
+        updated_data = cleaned_data
+
+    # Step 5: Save the updated data to the pickle file
+    save_to_pickle(updated_data)
