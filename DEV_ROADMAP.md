@@ -40,9 +40,11 @@
 ### **Modules and Key Files**
 
 1. **`train_models.py`**: Trains individual models (RandomForest, XGBoost, GradientBoosting, LSTM) across multiple timeframes.
+
    - **Timeframes**: `5m`, `15m`, `1h`, `1d`.
    - **Indicators Used**: MACD, RSI, Bollinger Bands, ATR, ADX, OBV, MFI, Impulse MACD.
    - **Best Parameter Tracking**: RMSE-based tracking, saved in `best_params.pkl`.
+
 2. **Models and their Functions**
 
    - **RandomForest, XGBoost, GradientBoosting**:
@@ -62,7 +64,7 @@
 
 1. **Modules and Key Files**:
 
-   - **`hypertuning.py`**:
+   - **`hypertune_models.py`**:
      - Scripts for cross-validation and parameter optimization across RandomForest, XGBoost, GradientBoosting, and LSTM.
      - Dynamically updates best-performing parameters to `best_params.pkl`.
 
@@ -156,42 +158,77 @@
 ## Directory Structure Overview
 
 ```plaintext
+SPY_TRADING_MODEL/
+├── backtests/
+│   ├── backtest_strategy.py               # Defines and simulates trading strategies.
+│   ├── backtest_summary.py                # Summarizes backtest results.
+│   ├── backtest.py                        # Runs backtests on historical data.
+│   └── sentiment_history.csv              # Historical sentiment data for analysis.
+│
 ├── data/
-│   ├── data_loader.py          # Loads and processes data
-│   ├── data_storage.py         # Manages data saving/loading
-│   ├── historical_data.pickle  # Cached historical data
-│   └── indicator_calculator.py # Calculates indicators (MACD, RSI, etc.)
+│   ├── data_loader.py                     # Loads and prepares historical and real-time data.
+│   ├── economic_data_loader.py            # Loads macroeconomic data (GDP, CPI, etc.).
+│   ├── indicator_calculator.py            # Calculates technical indicators (MACD, RSI, etc.).
+│   ├── market_data_loader.py              # Loads market data like VIX or IV.
+│   ├── save_sentiment_score.csv           # Saves sentiment analysis scores.
+│   └── sentiment_data_loader.py           # Loads and preprocesses sentiment data.
+│
+├── local_data/
+│   ├── historical_data.pickle             # Cache of historical data for access.
+│
+├── model_logs/                            # Logs of model training sessions.
+│
 ├── models/
-│   ├── train_models.py         # Main training script for all models
-│   ├── random_forest_model.py  # RandomForest model implementation
-│   ├── xgboost_model.py        # XGBoost model implementation
-│   ├── gradient_boosting_model.py # Gradient Boosting implementation
-│   ├── lstm_model.py           # LSTM model setup and training
-│   └── hypertuning.py          # Hypertuning scripts for all models
-├── simulate/
-│   ├── simulate_trade.py       # Simulates trades based on model predictions
-│   └── evaluate_model.py       # Evaluates model predictions for accuracy
-├── live/
-│   ├── live_trade_executor.py  # Executes live trades based on model outputs
+│   ├── gradient_boosting_model.py         # Trains Gradient Boosting model.
+│   ├── lstm_model.py                      # Trains LSTM model.
+│   ├── model_utils.py                     # Utility functions for model training and evaluation.
+│   ├── random_forest_model.py             # Trains Random Forest model.
+│   ├── rl_model.py                        # Reinforcement learning model setup.
+│   ├── stacking_and_lstm.py               # Stacks models with LSTM.
+│   └── train_models.py                    # Main script to train all models.
+│
+├── saved_models/                          # Stores best-performing model files.
+│   ├── GradientBoosting_5m_model.pkl
+│   ├── LSTM_1d_model.pkl
+│   ├── RandomForest_5m_model.pkl
+│   ├── XGBoost_5m_model.pkl
+│
+├── strategies/
+│   ├── apply_risk_management.py           # Applies risk management techniques.
+│   └── simulate_trade.py                  # Simulates trades based on model outputs.
+│
 ├── utils/
-│   ├── ensure_datetime.py      # Ensures correct datetime format in data
-│   └── model_utils.py          # Utility functions for model evaluation
-└── best_params.pkl             # Stores the best parameters based on RMSE
+│   ├── data_storage.py                    # Saves/loads data.
+│   ├── error_handling.py                  # Error handling functions.
+│   ├── generate_trade_signals.py          # Generates buy/sell signals based on indicators.
+│   ├── hypertune_models.py                # Hyperparameter tuning for all models.
+│   ├── randomize_data.py                  # Adds randomness to data for robust testing.
+│   └── view_pickle.py                     # Utility to view contents of pickle files.
+│
+├── venv/                                  # Virtual environment for dependencies.
+│
+├── .gitignore                             # Specifies files to ignore in version control.
+├── best_params.pkl                        # Stores best hyperparameters for each model.
+├── cleaned_data.pickle                    # Preprocessed data for model input.
+├── DEV_ROADMAP.md                         # Development roadmap for the SPY trading project.
+├── firebase_credentials.json              # Firebase credentials for secure access.
+├── README.md                              # Project overview and setup instructions.
+└── requirements.txt                       # Lists project dependencies.
 
 ## Future Enhancements
 
 - **Advanced Model Integration**:
-    - Explore advanced architectures (e.g., attention-based models) for improved prediction of SPY options.
-    - Potentially integrate reinforcement learning for more dynamic trade adjustments.
+    - Explore advanced architectures (e.g., attention-based models) for improved SPY options prediction.
+    - Potentially integrate reinforcement learning for dynamic trade adjustments.
 
 - **Expanded Indicator Use**:
-    - Add additional sentiment indicators or external economic indicators to enhance trade context.
+    - Add more sentiment or external economic indicators to provide a broader trade context.
 
 - **Comprehensive Dashboard**:
-    - Create a real-time dashboard to track model performance, indicators, and live trade stats.
+    - Build a real-time dashboard to track model performance, indicators, and live trade statistics.
 
 - **Automated Reporting**:
-    - Generate daily/weekly reports on model accuracy, trade performance, and potential adjustments.
+    - Generate automated daily/weekly reports on model accuracy, trade performance, and suggested adjustments.
 
 ---
 
@@ -200,4 +237,5 @@
 - **Complete Hypertuning** for all models and finalize optimal parameters.
 - **Evaluate Models in Backtesting** to verify predictions and run simulations.
 - **Prepare `live_trade_executor.py`** for real-time trading, ensuring seamless integration with trade strategies and risk management.
+
 ```
