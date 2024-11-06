@@ -1,7 +1,7 @@
 from xgboost import XGBRegressor
 from sklearn.model_selection import GridSearchCV
 
-def hypertune_xgboost(X_train, y_train):
+def hypertune_xgboost(X_train, y_train, **kwargs):
     print("Tuning XGBoost...")
     xgb_grid = {
         'n_estimators': [100, 200, 300],
@@ -18,6 +18,10 @@ def hypertune_xgboost(X_train, y_train):
     print("Best parameters for XGBoost:", xgb_cv.best_params_)
     return xgb_cv.best_estimator_
 
-def train_xgboost(X_train, y_train):
-    xgb_model = hypertune_xgboost(X_train, y_train)
+def train_xgboost(X_train, y_train, **kwargs):
+    if kwargs:  # If specific parameters are provided, use them
+        xgb_model = XGBRegressor(**kwargs)
+    else:  # Otherwise, run hypertuning
+        xgb_model = hypertune_xgboost(X_train, y_train)
+    xgb_model.fit(X_train, y_train)
     return xgb_model

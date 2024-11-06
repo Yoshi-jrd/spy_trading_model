@@ -18,6 +18,10 @@ def hypertune_random_forest(X_train, y_train):
     print("Best parameters for RandomForest:", rf_cv.best_params_)
     return rf_cv.best_estimator_
 
-def train_random_forest(X_train, y_train):
-    rf_model = hypertune_random_forest(X_train, y_train)
+def train_random_forest(X_train, y_train, **kwargs):
+    if kwargs:  # Use provided parameters if available
+        rf_model = RandomForestRegressor(**kwargs)
+    else:  # Otherwise, run hypertuning
+        rf_model = hypertune_random_forest(X_train, y_train)
+    rf_model.fit(X_train, y_train)
     return rf_model

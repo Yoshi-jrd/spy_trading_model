@@ -1,166 +1,203 @@
-# SPY Trading Model Project: Rough Development Roadmap
-
-### **Phase 1: Data Collection and Preparation (Completed)**
-
-- **Data Loader Development**:
-
-  - Pull real-time and historical data (SPY price, options data, sentiment, IV, VIX, etc.).
-  - Ensure proper formatting and validation of pulled data.
-  - Cache historical data for backtesting purposes.
-  - Add data processing logic (cleaning NaN values, ensuring datetime compatibility).
-  - Debugging data corruptions and handling inconsistencies.
-
-- **Current Status**:
-  - Data pull is working correctly, and the data corruption issue has been resolved.
-  - Implemented the logic to append new data rather than overwriting historical data.
-
-### **Phase 2: Model Framework Setup**
-
-- **Model Development**:
-  - **RandomForest, XGBoost, GradientBoosting**: Establish models for shorter timeframes.
-  - **LSTM**: For long-term predictions and capturing sequential data patterns.
-- **Key Tasks**:
-
-  - **Test individual models**:
-
-    - Validate that each model (RandomForest, XGBoost, GradientBoosting, LSTM) imports the data correctly and processes it.
-    - Verify that they are properly learning and updating with new data inputs.
-    - Ensure they are producing valid outputs and predictions based on the provided data.
-
-  - **Data Processing Checkpoints**:
-    - Ensure that each model handles all the technical indicators (MACD, RSI, etc.) and options data (IV, volume, open interest) correctly.
-    - Check for missing or corrupt values in the input during the testing process.
-    - Output key debugging information (dataset heads, tails, datetime validation).
-
-### **Phase 3: Model Hypertuning**
-
-- **Hypertuning the Models**:
-
-  - Once the individual models are verified, proceed with hypertuning.
-  - Optimize hyperparameters for each model to improve prediction accuracy (e.g., tuning depth, learning rates, number of estimators).
-  - Use cross-validation and the hypertuning scripts to find the best parameter sets for each model.
-
-- **Key Tasks**:
-  - Ensure that hypertuning works across all models.
-  - Output results to review performance for each set of hyperparameters.
-  - Select the optimal models for integration into the main predictive workflow.
-
-### **Phase 4: Model Evaluation and Trade Simulations**
-
-- **Model Evaluation**:
-
-  - Assess the individual model performances using historical data.
-  - Verify that model stacking (RandomForest, XGBoost, GradientBoosting) is working as intended to improve accuracy.
-  - Validate that LSTM is performing well for 1-hour and 1-day timeframes.
-
-- **Simulated Trade Execution**:
-  - Run trade simulations based on model outputs.
-  - Implement simulation logic for different trade types: credit spreads, debit spreads, condors, straddles.
-  - Incorporate risk management strategies (stop loss, profit-taking triggers).
-
-### **Phase 5: Live Trading and Automation**
-
-- **Automation of Trade Execution**:
-
-  - Finalize trade execution logic based on model predictions.
-  - Integrate rolling and early closure logic for trade management.
-  - Test and verify the model's performance in live market conditions.
-
-- **Ongoing Enhancements**:
-  - Continue refining model predictions based on new data and trade results.
-  - Add additional strategies (butterflies, strangles, etc.) if volatility or other conditions make them favorable.
+# SPY Trading Model Project: Comprehensive Development Roadmap
 
 ---
 
-### **Current Focus (Phase 2):**
+## Project Overview
 
-1. **Individual Model Testing**:
+- **Objective**: Build a predictive SPY options trading model leveraging various machine learning techniques to maximize profitability in short-term options trades.
+- **Core Strategies**: Focus on credit spreads, debit spreads, condors, and straddles. Utilize models to predict price action and guide trade entries and exits.
+- **Programming Language**: Python
+- **Primary Frameworks**: TensorFlow/Keras, Scikit-learn, XGBoost, and PyTorch (potential future use for enhanced deep learning models)
+- **File Structure**: Modularized for scalability and easy debugging.
 
-   - Ensure each model pulls and processes the data correctly.
-   - Validate that RandomForest, XGBoost, GradientBoosting, and LSTM are handling data inputs and producing valid predictions.
+---
 
-2. **Hypertuning**:
-   - Once testing is complete, begin hypertuning to optimize model performance.
+## Phase 1: Data Collection and Preparation (Completed)
 
-# Current State Improvements and immediate next steps
+### **Modules and Key Files**
 
-### Review of Current Code:
+1. **`data_loader.py`**: Handles data extraction, cleaning, and caching.
 
-- **Data Loader (`data_loader.py`)**:
+   - Sources: SPY price, options chain, IV, VIX, sentiment, GDP, CPI.
+   - Normalizes data formats, cleans NaNs, and ensures datetime compatibility.
+   - Caches historical data to `historical_data.pickle` for consistent backtesting.
 
-  - Properly imports SPY data and additional datasets (VIX, IV, GDP, CPI, Sentiment, Articles).
-  - Cleans the data using `ensure_datetime()` and handles missing values with forward and backward filling.
-  - Saves the data into a pickle file (`historical_data.pickle`).
-  - Ensures that new data overwrites the existing data properly (not just appending).
+2. **`data_storage.py`**: Manages data saving and loading operations for efficient access.
 
-- **Training Models (`train_models.py`)**:
-  - Trains models using multiple timeframes (`5m`, `15m`, `1h`, `1d`) of SPY data.
-  - Uses the best parameters for `RandomForest`, `XGBoost`, `GradientBoosting`, and `LSTM`.
-  - The models are hypertuned dynamically, with RMSE being tracked to update and store the best parameters.
-  - Evaluates model performance using MAE and RMSE.
-  - LSTM is now correctly handling reshaping of input data for time-series analysis.
+   - Stores cleaned, appended data to ensure up-to-date historical datasets.
 
-### Changes and Improvements Made:
+3. **`indicator_calculator.py`**: Calculates technical indicators for SPY data.
 
-1. **MACD Histogram Calculations**:
+   - **Indicators Included**: MACD, RSI, ATR, ADX, EMA, Bollinger Bands, OBV, MFI.
+   - Handles color-coding for `Impulse_MACD` and other sentiment indicators.
 
-   - The `MACD`, `MACD_Signal`, and `MACD_Histogram` values are now correctly calculated and loaded into the dataset.
-   - The issue with `NaN` values for these indicators has been resolved.
+4. **Status**: Data pulls are fully functional. All modules work seamlessly, and historical data is accessible via `historical_data.pickle`.
 
-2. **Impulse MACD**:
+---
 
-   - The color-coding (`Impulse_Color`) is now functional and reflects market sentiment changes based on MACD and RSI.
+## Phase 2: Model Development and Initial Testing (Completed)
 
-3. **Overwriting vs. Appending**:
+### **Modules and Key Files**
 
-   - We ensured that data is properly overwritten (instead of incorrectly appending new data), which resolves issues with data duplication.
-   - We’ve maintained a clean and updated `pickle` file (`historical_data.pickle`).
+1. **`train_models.py`**: Trains individual models (RandomForest, XGBoost, GradientBoosting, LSTM) across multiple timeframes.
+   - **Timeframes**: `5m`, `15m`, `1h`, `1d`.
+   - **Indicators Used**: MACD, RSI, Bollinger Bands, ATR, ADX, OBV, MFI, Impulse MACD.
+   - **Best Parameter Tracking**: RMSE-based tracking, saved in `best_params.pkl`.
+2. **Models and their Functions**
 
-4. **Data Integrity**:
+   - **RandomForest, XGBoost, GradientBoosting**:
+     - Short-term prediction models focusing on 5m, 15m, and 1h timeframes.
+   - **LSTM**:
+     - For sequential data, specifically targeted at the 1h and 1d timeframes to capture longer-term dependencies.
 
-   - All datasets (SPY, VIX, IV, GDP, CPI, Sentiment, Articles) are now loaded, cleaned, and normalized properly.
-   - No critical issues with missing or misaligned data.
+3. **Testing Outputs**:
+   - **Metrics**: Mean Absolute Error (MAE), Root Mean Square Error (RMSE).
+   - **Debugging**: Key checkpoint outputs for model performance, data integrity, and input structure validation.
 
-5. **Model Training and Hypertuning**:
+---
 
-   - The code dynamically updates the best parameters based on RMSE, storing them to `best_params.pkl`.
-   - We have ensured that all models (RandomForest, XGBoost, GradientBoosting, LSTM) are trained across all SPY timeframes with the calculated indicators.
+## Phase 3: Hypertuning and Model Optimization (In Progress)
 
-6. **Indicator Calculation**:
+### **Goals**: Refine model accuracy through hyperparameter tuning.
 
-   - Indicators like MACD, RSI, Bollinger Bands, ATR, and others are integrated into the model training process.
+1. **Modules and Key Files**:
 
-7. **LSTM Model Fixes**:
+   - **`hypertuning.py`**:
+     - Scripts for cross-validation and parameter optimization across RandomForest, XGBoost, GradientBoosting, and LSTM.
+     - Dynamically updates best-performing parameters to `best_params.pkl`.
 
-   - LSTM input reshaping and handling are fixed for time-series data.
-   - LSTM now trains successfully without issues related to input dimensions.
+2. **Tasks**:
 
-8. **Performance Enhancements**:
-   - Refactoring for cleaner, more modular code across data loading, model training, and evaluation.
-   - Performance optimization with RMSE-based dynamic parameter updates.
+   - **Run Hypertuning**:
+     - Test multiple parameter combinations to optimize each model’s performance (depth, estimators, learning rates, LSTM layers).
+     - Review and record parameter results to finalize models for further evaluation.
+   - **Track Results**:
+     - Log RMSE and MAE results to determine best-performing configurations for each timeframe.
 
-### Are We Ready for Additional Training?
+3. **Next Steps**:
+   - Complete hypertuning on the LSTM model for 1h and 1d timeframes.
+   - Finalize GradientBoosting and XGBoost configurations based on recent testing results.
 
-Yes, the model is ready for additional training and testing with all improvements. The system now:
+---
 
-- Properly handles data input, normalization, and indicator calculation.
-- Uses dynamic hypertuning based on RMSE to find the best model parameters.
-- Can efficiently train and evaluate models across multiple SPY timeframes.
+## Phase 4: Model Evaluation and Backtesting
 
-### List of Improvements:
+### **Objective**: Verify model accuracy on historical data, validate stacking methods, and simulate trades.
 
-1. Resolved `NaN` issues in `MACD` and `Impulse_MACD`.
-2. Added proper color coding for `Impulse_MACD` and fixed calculation issues.
-3. Switched from appending data to overwriting, ensuring data consistency.
-4. Improved data loading, cleaning, and normalizing steps for all datasets.
-5. Integrated indicators (MACD, RSI, Bollinger Bands, etc.) with the model training process.
-6. Added proper hypertuning for all models using RMSE to track and update best parameters.
-7. Fixed LSTM input handling for time-series data.
-8. Modularized code for better organization and performance optimization.
-9. Verified that data is properly saved to and loaded from the pickle file, ensuring clean, historical data is used.
+1. **Modules and Key Files**:
 
-### Next Steps:
+   - **`run_evaluation_workflow.py`**: Coordinates end-to-end evaluation across all models.
+   - **`simulate_trade.py`**: Simulates different options strategies based on model predictions.
+   - **`evaluate_model.py`**: Calculates and logs MAE and RMSE metrics across different model configurations and timeframes.
 
-- Train the models with the latest cleaned data.
-- Track and monitor performance, adjusting for any improvements as needed.
-- Review results and ensure that predictions are accurate and consistent across different timeframes.
+2. **Key Tasks**:
+
+   - **Model Evaluation**:
+     - Assess MAE and RMSE for each model, confirming consistency in prediction accuracy across timeframes.
+   - **Simulated Trade Execution**:
+     - Simulate trades, leveraging predicted price ranges and integrating stop-loss and profit-taking triggers.
+     - Strategies: Credit spreads, debit spreads, condors, and straddles.
+   - **Model Stacking**:
+     - Test stacked model predictions (RandomForest, XGBoost, GradientBoosting) to enhance prediction reliability.
+
+3. **Next Steps**:
+   - Execute comprehensive backtesting to verify model accuracy and adjust parameters if necessary.
+   - Integrate stacked predictions into simulations and analyze the effect on simulated trades.
+
+---
+
+## Phase 5: Real-Time Trade Execution and Automation
+
+### **Objective**: Implement and test live market trade execution based on model outputs.
+
+1. **Modules and Key Files**:
+
+   - **`live_trade_executor.py`**: Responsible for triggering live trades based on model signals.
+     - Supports entry, exit, and rolling logic for active trades.
+     - Includes stop-loss and profit-taking mechanisms.
+
+2. **Trade Logic**:
+
+   - **Trade Triggering**:
+     - Automatically execute high-confidence trades based on model outputs, starting with credit spreads and straddles.
+   - **Risk Management**:
+     - Set conservative stop-loss levels for live trading.
+     - Automate trade rolling and closure based on market conditions to limit exposure.
+
+3. **Real-Time Testing**:
+   - Begin low-risk trades in real-time, tracking model predictions against actual price movements.
+   - Fine-tune live trade parameters based on initial results, adjusting for market volatility and news events.
+
+---
+
+## Current Status and Immediate Focus
+
+1. **Completed Steps**:
+
+   - **Data Loading**: Ensured all data sources are clean and integrated.
+   - **Model Training**: Verified initial training and predictions for all models across multiple timeframes.
+   - **LSTM Model Fixes**: Addressed reshaping and data structure requirements.
+
+2. **Current Immediate Focus**:
+
+   - **Finalize Hypertuning**:
+     - Complete parameter optimization for all models, prioritizing RMSE improvement.
+   - **Backtesting and Evaluation**:
+     - Run evaluation workflow on optimized models to verify predictions.
+   - **Prepare for Real-Time Testing**:
+     - Finalize `live_trade_executor.py` and ensure all trade strategies are correctly triggered.
+
+3. **Performance Enhancements**:
+   - Continue code refactoring to maintain modularity and efficiency.
+   - Set up enhanced error logging for trade simulations and live executions.
+
+---
+
+## Directory Structure Overview
+
+```plaintext
+├── data/
+│   ├── data_loader.py          # Loads and processes data
+│   ├── data_storage.py         # Manages data saving/loading
+│   ├── historical_data.pickle  # Cached historical data
+│   └── indicator_calculator.py # Calculates indicators (MACD, RSI, etc.)
+├── models/
+│   ├── train_models.py         # Main training script for all models
+│   ├── random_forest_model.py  # RandomForest model implementation
+│   ├── xgboost_model.py        # XGBoost model implementation
+│   ├── gradient_boosting_model.py # Gradient Boosting implementation
+│   ├── lstm_model.py           # LSTM model setup and training
+│   └── hypertuning.py          # Hypertuning scripts for all models
+├── simulate/
+│   ├── simulate_trade.py       # Simulates trades based on model predictions
+│   └── evaluate_model.py       # Evaluates model predictions for accuracy
+├── live/
+│   ├── live_trade_executor.py  # Executes live trades based on model outputs
+├── utils/
+│   ├── ensure_datetime.py      # Ensures correct datetime format in data
+│   └── model_utils.py          # Utility functions for model evaluation
+└── best_params.pkl             # Stores the best parameters based on RMSE
+
+## Future Enhancements
+
+- **Advanced Model Integration**:
+    - Explore advanced architectures (e.g., attention-based models) for improved prediction of SPY options.
+    - Potentially integrate reinforcement learning for more dynamic trade adjustments.
+
+- **Expanded Indicator Use**:
+    - Add additional sentiment indicators or external economic indicators to enhance trade context.
+
+- **Comprehensive Dashboard**:
+    - Create a real-time dashboard to track model performance, indicators, and live trade stats.
+
+- **Automated Reporting**:
+    - Generate daily/weekly reports on model accuracy, trade performance, and potential adjustments.
+
+---
+
+## Key Next Steps Summary
+
+- **Complete Hypertuning** for all models and finalize optimal parameters.
+- **Evaluate Models in Backtesting** to verify predictions and run simulations.
+- **Prepare `live_trade_executor.py`** for real-time trading, ensuring seamless integration with trade strategies and risk management.
+```

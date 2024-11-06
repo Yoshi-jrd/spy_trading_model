@@ -18,6 +18,10 @@ def hypertune_gradient_boosting(X_train, y_train):
     print("Best parameters for Gradient Boosting:", gb_cv.best_params_)
     return gb_cv.best_estimator_
 
-def train_gradient_boosting(X_train, y_train):
-    gb_model = hypertune_gradient_boosting(X_train, y_train)
+def train_gradient_boosting(X_train, y_train, **kwargs):
+    if kwargs:  # Use provided parameters if available
+        gb_model = GradientBoostingRegressor(**kwargs)
+    else:  # Otherwise, run hypertuning
+        gb_model = hypertune_gradient_boosting(X_train, y_train)
+    gb_model.fit(X_train, y_train)
     return gb_model
