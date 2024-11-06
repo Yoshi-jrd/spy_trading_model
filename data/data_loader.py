@@ -131,25 +131,23 @@ def load_existing_data(filename='local_data/historical_data.pickle'):
         print(f"{filename} not found. No existing data to load.")
         return None
 
-def append_new_data(existing_data, new_data):
+def overwrite_new_data(existing_data, new_data):
     """
-    Append new data to the existing data. Only append data that doesn't already exist.
+    Overwrite existing data with new data.
     """
     for key, df_new in new_data.items():
         if isinstance(df_new, dict):
             for sub_key, sub_df_new in df_new.items():
+                # Overwrite the existing data for the subkey
                 if key in existing_data and sub_key in existing_data[key]:
-                    sub_df_existing = existing_data[key][sub_key]
-                    existing_data[key][sub_key] = pd.concat([sub_df_existing, sub_df_new]).drop_duplicates(subset='datetime')
+                    existing_data[key][sub_key] = sub_df_new
                 else:
                     if key not in existing_data:
                         existing_data[key] = {}
                     existing_data[key][sub_key] = sub_df_new
         else:
-            if key in existing_data:
-                existing_data[key] = pd.concat([existing_data[key], df_new]).drop_duplicates(subset='datetime')
-            else:
-                existing_data[key] = df_new
+            # Overwrite the existing data for the key
+            existing_data[key] = df_new
     return existing_data
 
 def save_to_pickle(data, filename='local_data/historical_data.pickle'):
@@ -171,8 +169,8 @@ if __name__ == "__main__":
     existing_data = load_existing_data()
 
     if existing_data:
-        # Step 4: Append the new data to the existing data
-        updated_data = append_new_data(existing_data, cleaned_data)
+        # Step 4: Overwrite the new data to the existing data
+        updated_data = overwrite_new_data(existing_data, cleaned_data)
     else:
         # If no existing data, use the new data directly
         updated_data = cleaned_data

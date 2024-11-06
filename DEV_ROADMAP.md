@@ -81,3 +81,86 @@
 
 2. **Hypertuning**:
    - Once testing is complete, begin hypertuning to optimize model performance.
+
+# Current State Improvements and immediate next steps
+
+### Review of Current Code:
+
+- **Data Loader (`data_loader.py`)**:
+
+  - Properly imports SPY data and additional datasets (VIX, IV, GDP, CPI, Sentiment, Articles).
+  - Cleans the data using `ensure_datetime()` and handles missing values with forward and backward filling.
+  - Saves the data into a pickle file (`historical_data.pickle`).
+  - Ensures that new data overwrites the existing data properly (not just appending).
+
+- **Training Models (`train_models.py`)**:
+  - Trains models using multiple timeframes (`5m`, `15m`, `1h`, `1d`) of SPY data.
+  - Uses the best parameters for `RandomForest`, `XGBoost`, `GradientBoosting`, and `LSTM`.
+  - The models are hypertuned dynamically, with RMSE being tracked to update and store the best parameters.
+  - Evaluates model performance using MAE and RMSE.
+  - LSTM is now correctly handling reshaping of input data for time-series analysis.
+
+### Changes and Improvements Made:
+
+1. **MACD Histogram Calculations**:
+
+   - The `MACD`, `MACD_Signal`, and `MACD_Histogram` values are now correctly calculated and loaded into the dataset.
+   - The issue with `NaN` values for these indicators has been resolved.
+
+2. **Impulse MACD**:
+
+   - The color-coding (`Impulse_Color`) is now functional and reflects market sentiment changes based on MACD and RSI.
+
+3. **Overwriting vs. Appending**:
+
+   - We ensured that data is properly overwritten (instead of incorrectly appending new data), which resolves issues with data duplication.
+   - We’ve maintained a clean and updated `pickle` file (`historical_data.pickle`).
+
+4. **Data Integrity**:
+
+   - All datasets (SPY, VIX, IV, GDP, CPI, Sentiment, Articles) are now loaded, cleaned, and normalized properly.
+   - No critical issues with missing or misaligned data.
+
+5. **Model Training and Hypertuning**:
+
+   - The code dynamically updates the best parameters based on RMSE, storing them to `best_params.pkl`.
+   - We have ensured that all models (RandomForest, XGBoost, GradientBoosting, LSTM) are trained across all SPY timeframes with the calculated indicators.
+
+6. **Indicator Calculation**:
+
+   - Indicators like MACD, RSI, Bollinger Bands, ATR, and others are integrated into the model training process.
+
+7. **LSTM Model Fixes**:
+
+   - LSTM input reshaping and handling are fixed for time-series data.
+   - LSTM now trains successfully without issues related to input dimensions.
+
+8. **Performance Enhancements**:
+   - Refactoring for cleaner, more modular code across data loading, model training, and evaluation.
+   - Performance optimization with RMSE-based dynamic parameter updates.
+
+### Are We Ready for Additional Training?
+
+Yes, the model is ready for additional training and testing with all improvements. The system now:
+
+- Properly handles data input, normalization, and indicator calculation.
+- Uses dynamic hypertuning based on RMSE to find the best model parameters.
+- Can efficiently train and evaluate models across multiple SPY timeframes.
+
+### List of Improvements:
+
+1. Resolved `NaN` issues in `MACD` and `Impulse_MACD`.
+2. Added proper color coding for `Impulse_MACD` and fixed calculation issues.
+3. Switched from appending data to overwriting, ensuring data consistency.
+4. Improved data loading, cleaning, and normalizing steps for all datasets.
+5. Integrated indicators (MACD, RSI, Bollinger Bands, etc.) with the model training process.
+6. Added proper hypertuning for all models using RMSE to track and update best parameters.
+7. Fixed LSTM input handling for time-series data.
+8. Modularized code for better organization and performance optimization.
+9. Verified that data is properly saved to and loaded from the pickle file, ensuring clean, historical data is used.
+
+### Next Steps:
+
+- Train the models with the latest cleaned data.
+- Track and monitor performance, adjusting for any improvements as needed.
+- Review results and ensure that predictions are accurate and consistent across different timeframes.

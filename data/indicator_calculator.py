@@ -8,6 +8,11 @@ def calculate_indicators(df):
     df['EMA26'] = df['Close'].ewm(span=21, adjust=False).mean()
     df['MACD'] = df['EMA12'] - df['EMA26']
     df['MACD_Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
+    df['MACD_Histogram'] = df['MACD'] - df['MACD_Signal']
+
+    # Print to verify MACD_Histogram values
+    print("\n--- MACD Histogram Preview ---")
+    print(df[['MACD', 'MACD_Signal', 'MACD_Histogram']].head())
 
     # RSI
     delta = df['Close'].diff(1)
@@ -50,17 +55,27 @@ def calculate_indicators(df):
     df['EMA9'] = df['Close'].ewm(span=9, adjust=False).mean()
     df['EMA21'] = df['Close'].ewm(span=21, adjust=False).mean()
 
-    # OBV
+    # OBV (On Balance Volume)
     df['OBV'] = (df['Volume'] * ((df['Close'] > df['Close'].shift(1)) * 2 - 1)).cumsum()
 
-    # MFI
+    # MFI (Money Flow Index)
     tp = (df['High'] + df['Low'] + df['Close']) / 3
     mf = tp * df['Volume']
     pos_mf = mf.where(tp > tp.shift(1), 0).rolling(window=14).sum()
     neg_mf = mf.where(tp < tp.shift(1), 0).rolling(window=14).sum()
     df['MFI'] = 100 - (100 / (1 + pos_mf / neg_mf))
 
-    df.ffill(inplace=True)  # Forward fill missing values
-    df.fillna(0, inplace=True)  # Replace remaining NaNs with 0
+    # Impulse MACD and RSI (LazyBear)
+    df['Impulse_MACD'] = df['MACD']
+    df['Impulse_RSI'] = df['RSI']
+
+    # Calculate color signal for the Impulse MACD using MACD_Histogram
+    df['Impulse_Color'] = 'gray'  # Neutral by default
+    df.loc[(df['MACD_Histogram'] > 0) & (df['RSI'] > df['RSI'].shift(1)), 'Impulse_Color'] = 'green'  # Bullish
+    df.loc[(df['MACD_Histogram'] < 0) & (df['RSI'] < df['RSI'].shift(1)), 'Impulse_Color'] = 'red'  # Bearish
+
+    # Forward fill missing values and fill NaN with 0
+    df.ffill(inplace=True)
+    df.fillna(0, inplace=True)
 
     return df
