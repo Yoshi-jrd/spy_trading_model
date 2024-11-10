@@ -1,20 +1,24 @@
 import pandas as pd
 
 def calculate_indicators(df):
+    """
+    Calculate prioritized indicators for 24-96 hour trade predictions.
+    Focuses on high-impact indicators only, streamlining calculations.
+    """
     df = df.copy()
 
-    # MACD
+    # MACD - Focus on Histogram as a key momentum indicator
     df['EMA12'] = df['Close'].ewm(span=8, adjust=False).mean()
     df['EMA26'] = df['Close'].ewm(span=21, adjust=False).mean()
     df['MACD'] = df['EMA12'] - df['EMA26']
     df['MACD_Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
     df['MACD_Histogram'] = df['MACD'] - df['MACD_Signal']
 
-    # Print to verify MACD_Histogram values
-    print("\n--- MACD Histogram Preview ---")
+    # Print for validation of MACD values
+    print("\n--- MACD Histogram (Key Momentum Indicator) ---")
     print(df[['MACD', 'MACD_Signal', 'MACD_Histogram']].head())
 
-    # RSI
+    # RSI - Key Overbought/Oversold Indicator
     delta = df['Close'].diff(1)
     gain = delta.where(delta > 0, 0)
     loss = -delta.where(delta < 0, 0)
@@ -23,25 +27,19 @@ def calculate_indicators(df):
     rs = avg_gain / avg_loss
     df['RSI'] = 100 - (100 / (1 + rs))
 
-    # Bollinger Bands
+    # Bollinger Bands for volatility analysis
     df['SMA20'] = df['Close'].rolling(window=20).mean()
     df['UpperBand'] = df['SMA20'] + 2 * df['Close'].rolling(window=20).std()
     df['LowerBand'] = df['SMA20'] - 2 * df['Close'].rolling(window=20).std()
 
-    # Stochastic Oscillator
-    low_min = df['Low'].rolling(window=14).min()
-    high_max = df['High'].rolling(window=14).max()
-    df['%K'] = (df['Close'] - low_min) * 100 / (high_max - low_min)
-    df['%D'] = df['%K'].rolling(window=3).mean()
-
-    # ATR
+    # ATR - Average True Range for volatility assessment
     df['PrevClose'] = df['Close'].shift(1)
     df['TR'] = df[['High', 'Low', 'PrevClose']].apply(
         lambda row: max(row['High'] - row['Low'], abs(row['High'] - row['PrevClose']), abs(row['Low'] - row['PrevClose'])), axis=1
     )
     df['ATR'] = df['TR'].rolling(window=14).mean()
 
-    # ADX
+    # ADX - Trend strength indicator
     plus_dm = df['High'].diff().clip(lower=0)
     minus_dm = df['Low'].diff().clip(upper=0).abs()
     tr14 = df['TR'].rolling(window=14).sum()
@@ -51,31 +49,35 @@ def calculate_indicators(df):
     df['MinusDI'] = 100 * (minus_dm14 / tr14)
     df['ADX'] = 100 * (abs(df['PlusDI'] - df['MinusDI']) / (df['PlusDI'] + df['MinusDI'])).rolling(window=14).mean()
 
-    # EMA Crossovers
+    # EMA Crossovers - For trend direction
     df['EMA9'] = df['Close'].ewm(span=9, adjust=False).mean()
     df['EMA21'] = df['Close'].ewm(span=21, adjust=False).mean()
 
-    # OBV (On Balance Volume)
-    df['OBV'] = (df['Volume'] * ((df['Close'] > df['Close'].shift(1)) * 2 - 1)).cumsum()
+    # Print for EMA crossover verification
+    print("\n--- EMA Crossovers Preview ---")
+    print(df[['EMA9', 'EMA21']].head())
 
-    # MFI (Money Flow Index)
+    # MFI (Money Flow Index) for money flow assessment
     tp = (df['High'] + df['Low'] + df['Close']) / 3
     mf = tp * df['Volume']
     pos_mf = mf.where(tp > tp.shift(1), 0).rolling(window=14).sum()
     neg_mf = mf.where(tp < tp.shift(1), 0).rolling(window=14).sum()
     df['MFI'] = 100 - (100 / (1 + pos_mf / neg_mf))
 
-    # Impulse MACD and RSI (LazyBear)
+    # Impulse MACD and RSI - LazyBear (Key for bullish/bearish conditions)
     df['Impulse_MACD'] = df['MACD']
     df['Impulse_RSI'] = df['RSI']
-
-    # Calculate color signal for the Impulse MACD using MACD_Histogram
+    
+    # Assign colors for the Impulse MACD, helpful for visual sentiment representation
     df['Impulse_Color'] = 'gray'  # Neutral by default
     df.loc[(df['MACD_Histogram'] > 0) & (df['RSI'] > df['RSI'].shift(1)), 'Impulse_Color'] = 'green'  # Bullish
     df.loc[(df['MACD_Histogram'] < 0) & (df['RSI'] < df['RSI'].shift(1)), 'Impulse_Color'] = 'red'  # Bearish
 
-    # Forward fill missing values and fill NaN with 0
+    # Forward fill and fill NaN with 0 to handle any missing values
     df.ffill(inplace=True)
     df.fillna(0, inplace=True)
+
+    print("\n--- Indicator Calculation Complete ---")
+    print(df[['MACD_Histogram', 'RSI', 'UpperBand', 'LowerBand', 'ATR', 'ADX', 'Impulse_Color']].head())
 
     return df

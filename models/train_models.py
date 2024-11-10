@@ -1,4 +1,4 @@
-# Add the parent directory to the system path
+# Import necessary modules
 import os
 import sys
 import pickle
@@ -32,7 +32,6 @@ def load_best_params():
                 return pickle.load(f)
         except EOFError:
             print("Warning: best_params.pkl is empty or corrupted. Resetting to default parameters.")
-    # Default parameters if file is missing or corrupted
     return {
         'RandomForest': {'n_estimators': 200, 'max_depth': 20, 'min_samples_split': 2, 'min_samples_leaf': 1, 'max_features': 'sqrt'},
         'XGBoost': {'n_estimators': 100, 'learning_rate': 0.2, 'max_depth': 3, 'min_child_weight': 3, 'gamma': 0},
@@ -72,13 +71,14 @@ for timeframe, spy_df in spy_data.items():
     color_mapping = {'red': -1, 'green': 1, 'gray': 0}
     spy_df['Impulse_Color'] = spy_df['Impulse_Color'].map(color_mapping)
 
-    # Prepare features and target, select only numeric columns
-    X = spy_df.drop(columns=['Close', 'datetime']).select_dtypes(include=[np.number])  # Only numeric columns
+    # Filter columns to include only prioritized indicators
+    selected_features = ['MACD_Histogram', 'RSI', 'UpperBand', 'LowerBand', 'ATR', 'ADX', 'EMA9', 'EMA21', 'Impulse_Color']
+    X = spy_df[selected_features]
     y = spy_df['Close']
     X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Debugging: Check if X_train contains only numeric columns
-    print(f"Columns in X_train after color conversion and numeric filtering: {X_train.columns}")
+    # Debugging: Check columns in X_train to confirm selected features
+    print(f"Selected features for training: {X_train.columns}")
 
     # -----------------------------
     # Train and Hypertune each model
@@ -112,29 +112,27 @@ for timeframe, spy_df in spy_data.items():
 # LSTM Model
 print(f"Training LSTM Model on {timeframe} timeframe...")
 try:
-    # Determine input shape
+    # Determine input shape for LSTM
     X_train_reshaped = X_train.values.reshape((X_train.shape[0], 1, X_train.shape[1]))
     X_val_reshaped = X_val.values.reshape((X_val.shape[0], 1, X_val.shape[1]))
     input_shape = (X_train_reshaped.shape[1], X_train_reshaped.shape[2])
 
-    # Debugging shapes
+    # Debugging shapes for LSTM input validation
     print(f"X_train reshaped for LSTM: {X_train_reshaped.shape}")
     print(f"X_val reshaped for LSTM: {X_val_reshaped.shape}")
 
-    # Initialize LSTM model with input shape as a keyword argument
+    # Initialize LSTM model
     lstm_model = KerasRegressor(
         model=build_lstm_model,
-        model__input_shape=input_shape,  # Pass input_shape as a keyword argument to the model
+        model__input_shape=input_shape,
         epochs=50,
         batch_size=32,
         verbose=0
     )
 
-    # Fit the model
+    # Train and evaluate the LSTM model
     lstm_model.fit(X_train_reshaped, y_train)
     lstm_val_predictions = lstm_model.predict(X_val_reshaped).flatten()
-
-    # Evaluate and log LSTM performance
     lstm_mae, lstm_rmse = evaluate_model(y_val, lstm_val_predictions)
     print(f"LSTM - {timeframe} - MAE: {lstm_mae}, RMSE: {lstm_rmse}")
     update_best_params_and_save_model('LSTM', lstm_model, lstm_rmse, lstm_model.get_params())

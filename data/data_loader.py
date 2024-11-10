@@ -2,9 +2,9 @@ import os
 import sys
 import pickle
 from datetime import datetime
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import pandas as pd
-from sklearn.model_selection import train_test_split
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data.market_data_loader import load_spy_multi_timeframes, get_vix_futures, get_all_iv
 from data.economic_data_loader import load_economic_data
 from data.sentiment_data_loader import get_news_sentiment
@@ -27,8 +27,16 @@ def import_data():
     print("IV data columns:", iv_data.columns)
     print("GDP data shape:", gdp_data.shape)
     print("CPI data shape:", cpi_data.shape)
-    print("Sentiment data:", sentiment_data)
-    print("Articles:", articles)
+    
+    if isinstance(sentiment_data, pd.DataFrame):
+        print("Sentiment data preview:", sentiment_data.head())
+    else:
+        print("Sentiment data value:", sentiment_data)
+    
+    if isinstance(articles, pd.DataFrame):
+        print("Articles preview:", articles.head())
+    else:
+        print("Articles:", articles)
 
     return spy_data, vix_data, iv_data, gdp_data, cpi_data, sentiment_data, articles
 
@@ -68,14 +76,17 @@ def clean_and_normalize(spy_data, vix_data, iv_data, gdp_data, cpi_data, sentime
         
         df = df.ffill().bfill()
         spy_data_cleaned[tf] = df
+        print(f"SPY {tf} data cleaned. Shape: {df.shape}")
 
     print("\nCleaning VIX data")
     vix_data = ensure_datetime(vix_data, ['Date', 'Datetime'])
     vix_data = vix_data.ffill()
+    print("VIX data cleaned. Shape:", vix_data.shape)
 
     print("\nCleaning IV data")
     iv_data = ensure_datetime(iv_data, ['expiry'])
     iv_data = iv_data.ffill()
+    print("IV data cleaned. Shape:", iv_data.shape)
 
     print("\nCleaning GDP and CPI data")
     gdp_data = pd.DataFrame(gdp_data).reset_index()
@@ -84,10 +95,13 @@ def clean_and_normalize(spy_data, vix_data, iv_data, gdp_data, cpi_data, sentime
     cpi_data.columns = ['datetime', 'value']
     gdp_data = gdp_data.ffill().bfill()
     cpi_data = cpi_data.ffill().bfill()
+    print("GDP data cleaned. Shape:", gdp_data.shape)
+    print("CPI data cleaned. Shape:", cpi_data.shape)
 
     print("\nCleaning Sentiment data")
     current_date = datetime.now().strftime('%Y-%m-%d')
     sentiment_data_cleaned = pd.DataFrame({'datetime': [current_date], 'sentiment_value': [sentiment_data]})
+    print("Sentiment data cleaned. Shape:", sentiment_data_cleaned.shape)
 
     print("\nCleaning Articles data")
     articles_cleaned = pd.DataFrame(articles.get('articles', []))
@@ -97,6 +111,7 @@ def clean_and_normalize(spy_data, vix_data, iv_data, gdp_data, cpi_data, sentime
         articles_cleaned['datetime'] = articles_cleaned['datetime'].ffill().bfill()
     else:
         articles_cleaned['datetime'] = current_date
+    print("Articles data cleaned. Shape:", articles_cleaned.shape)
 
     datasets = {
         'spy_data': spy_data_cleaned,
@@ -131,23 +146,28 @@ def load_existing_data(filename='local_data/historical_data.pickle'):
         print(f"{filename} not found. No existing data to load.")
         return None
 
-def overwrite_new_data(existing_data, new_data):
+def append_new_data(existing_data, new_data):
     """
-    Overwrite existing data with new data.
+    Append only new data to the existing data, ensuring a continuous historical record.
     """
     for key, df_new in new_data.items():
         if isinstance(df_new, dict):
             for sub_key, sub_df_new in df_new.items():
-                # Overwrite the existing data for the subkey
                 if key in existing_data and sub_key in existing_data[key]:
-                    existing_data[key][sub_key] = sub_df_new
+                    existing_data[key][sub_key] = pd.concat(
+                        [existing_data[key][sub_key], sub_df_new]
+                    ).drop_duplicates(subset='datetime').sort_values(by='datetime')
                 else:
                     if key not in existing_data:
                         existing_data[key] = {}
                     existing_data[key][sub_key] = sub_df_new
         else:
-            # Overwrite the existing data for the key
-            existing_data[key] = df_new
+            if key in existing_data:
+                existing_data[key] = pd.concat(
+                    [existing_data[key], df_new]
+                ).drop_duplicates(subset='datetime').sort_values(by='datetime')
+            else:
+                existing_data[key] = df_new
     return existing_data
 
 def save_to_pickle(data, filename='local_data/historical_data.pickle'):
@@ -169,8 +189,8 @@ if __name__ == "__main__":
     existing_data = load_existing_data()
 
     if existing_data:
-        # Step 4: Overwrite the new data to the existing data
-        updated_data = overwrite_new_data(existing_data, cleaned_data)
+        # Step 4: Append the new data to the existing data
+        updated_data = append_new_data(existing_data, cleaned_data)
     else:
         # If no existing data, use the new data directly
         updated_data = cleaned_data

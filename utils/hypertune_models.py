@@ -1,157 +1,109 @@
 # Import necessary modules and functions
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from data.market_data_loader import load_spy_multi_timeframes, get_vix_futures, get_all_iv
-from data.economic_data_loader import load_economic_data
-from data.sentiment_data_loader import get_news_sentiment
-from sklearn.model_selection import train_test_split, GridSearchCV, KFold
+import logging
+import numpy as np
+import pandas as pd
+import xgboost as xgb
+import pickle
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-import xgboost as xgb
-import pandas as pd
-import numpy as np
-
-# Load the custom data loader function
-def load_data():
-    spy_df = load_spy_multi_timeframes()  # Load SPY data
-    vix_df = get_vix_futures()            # Load VIX data
-    iv_data = get_all_iv()                # Load IV data
-    gdp_data, cpi_data = load_economic_data()  # Load economic data
-    avg_sentiment, articles = get_news_sentiment()  # Fetch news sentiment data
-
-    # Add a NaN check function to detect data issues
-    def check_nan_in_data(data, name):
-        if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
-            if data.isna().sum().sum() > 0:
-                print(f"Warning: {name} contains NaN values.")
-            else:
-                print(f"{name} contains no NaN values.")
-        else:
-            print(f"{name} is not a DataFrame or Series.")
-
-    for timeframe, df in spy_df.items():
-        check_nan_in_data(df, f"SPY data ({timeframe})")
-    
-    check_nan_in_data(vix_df, "VIX data")
-    check_nan_in_data(iv_data, "IV data")
-    check_nan_in_data(gdp_data, "GDP data")
-    check_nan_in_data(cpi_data, "CPI data")
-
-    data = {
-        'spy_data': spy_df,
-        'vix_data': vix_df,
-        'iv_data': iv_data,
-        'gdp_data': gdp_data,
-        'cpi_data': cpi_data,
-        'sentiment_data': avg_sentiment,
-        'articles': articles
-    }
-
-    print("Final data structure:")
-    for key, value in data.items():
-        if isinstance(value, pd.DataFrame) or isinstance(value, pd.Series):
-            print(f"{key}: {value.shape}")
-        else:
-            print(f"{key}: {type(value)}")
-
-    return data
-
-# Prepare the data for training and testing
-def prepare_data():
-    data = load_data()
-    spy_5m_data = data['spy_data']['5m']
-
-    # Ensure 'Date' column exists and is properly set
-    if 'Date' in spy_5m_data.columns:
-        spy_5m_data['Date'] = pd.to_datetime(spy_5m_data['Date'])
-        spy_5m_data.set_index('Date', inplace=True)
-
-    # Add cyclical encoding for time features
-    spy_5m_data['day_of_week'] = spy_5m_data.index.dayofweek
-    spy_5m_data['hour'] = spy_5m_data.index.hour
-    spy_5m_data['minute'] = spy_5m_data.index.minute
-    spy_5m_data['hour_sin'] = np.sin(2 * np.pi * spy_5m_data['hour'] / 24)
-    spy_5m_data['hour_cos'] = np.cos(2 * np.pi * spy_5m_data['hour'] / 24)
-    spy_5m_data['minute_sin'] = np.sin(2 * np.pi * spy_5m_data['minute'] / 60)
-    spy_5m_data['minute_cos'] = np.cos(2 * np.pi * spy_5m_data['minute'] / 60)
-
-    # Ensure VIX data is properly indexed and resampled
-    vix_data = data['vix_data']
-    if 'Date' in vix_data.columns:
-        vix_data['Date'] = pd.to_datetime(vix_data['Date'])
-        vix_data.set_index('Date', inplace=True)
-
-    vix_data_resampled = vix_data.resample('5min').ffill().reindex(spy_5m_data.index)
-
-    # Define features and target
-    features = spy_5m_data.drop('Close', axis=1)
-    target = spy_5m_data['Close']
-
-    # Combine with VIX data if needed
-    combined_data = pd.merge(features, vix_data_resampled, left_index=True, right_index=True, how='left')
-
-    # Fill missing values
-    combined_data.fillna(method='ffill', inplace=True)
-
-    # Split data
-    X_train, X_test, y_train, y_test = train_test_split(combined_data, target, test_size=0.2, random_state=42)
-
-    return X_train, X_test, y_train, y_test
-
-# Hyperparameter tuning functions
-def hypertune_random_forest(X_train, y_train):
-    rf_grid = {
-        'n_estimators': [100, 200, 300],
-        'max_depth': [10, 20, 30, None],
-        'min_samples_split': [2, 5, 10],
-        'min_samples_leaf': [1, 2, 4],
-        'max_features': ['sqrt', 'log2']
-    }
-    rf = RandomForestRegressor()
-    rf_cv = GridSearchCV(estimator=rf, param_grid=rf_grid, cv=3, scoring='neg_mean_squared_error')
-    rf_cv.fit(X_train, y_train)
-    print("Best parameters for RandomForest:", rf_cv.best_params_)
-    return rf_cv.best_estimator_
-
-def hypertune_xgboost(X_train, y_train):
-    xgb_grid = {
-        'n_estimators': [100, 200, 300],
-        'learning_rate': [0.01, 0.1, 0.2],
-        'max_depth': [3, 5, 7],
-        'min_child_weight': [1, 3, 5],
-        'gamma': [0, 0.1, 0.3]
-    }
-    xgboost = xgb.XGBRegressor()
-    xgb_cv = GridSearchCV(estimator=xgboost, param_grid=xgb_grid, cv=3, scoring='neg_mean_squared_error')
-    xgb_cv.fit(X_train, y_train)
-    print("Best parameters for XGBoost:", xgb_cv.best_params_)
-    return xgb_cv.best_estimator_
-
-def hypertune_gradient_boosting(X_train, y_train):
-    gb_grid = {
-        'n_estimators': [100, 200, 300],
-        'learning_rate': [0.01, 0.1, 0.2],
-        'max_depth': [3, 5, 7],
-        'min_samples_split': [2, 5, 10],
-        'min_samples_leaf': [1, 2, 4]
-    }
-    gb = GradientBoostingRegressor()
-    gb_cv = GridSearchCV(estimator=gb, param_grid=gb_grid, cv=3, scoring='neg_mean_squared_error')
-    gb_cv.fit(X_train, y_train)
-    print("Best parameters for Gradient Boosting:", gb_cv.best_params_)
-    return gb_cv.best_estimator_
-
-# LSTM Hypertuning
 from keras.models import Sequential
 from keras.layers import LSTM, Dense, Dropout
 from keras.optimizers import Adam
-from keras.wrappers.scikit_learn import KerasRegressor
+from scikeras.wrappers import KerasRegressor
 
-def build_lstm_model(units=50, dropout=0.2, learning_rate=0.01):
+# Set up logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
+# Load data from historical_data.pickle
+def load_pickle_data(file_path='local_data/historical_data.pickle'):
+    try:
+        with open(file_path, 'rb') as f:
+            data = pickle.load(f)
+        logger.info("Data loaded successfully from historical_data.pickle")
+        return data
+    except FileNotFoundError:
+        logger.error(f"File not found: {file_path}")
+        return None
+
+# Prepare data using the pickle file
+def prepare_data(timeframes=['5m', '15m', '1h', '1d']):
+    data = load_pickle_data()
+    if data is None:
+        return None, None, None, None
+
+    combined_data = []
+    for timeframe in timeframes:
+        spy_data = data.get('spy_data', {}).get(timeframe, pd.DataFrame())
+        if spy_data.empty:
+            logger.warning(f"SPY {timeframe} data is missing or empty in the pickle file.")
+            continue
+        
+        if 'datetime' in spy_data.columns:
+            spy_data['datetime'] = pd.to_datetime(spy_data['datetime'], errors='coerce')
+            spy_data.set_index('datetime', inplace=True)
+
+        color_mapping = {'red': -1, 'green': 1, 'gray': 0}
+        spy_data['Impulse_Color'] = spy_data['Impulse_Color'].map(color_mapping)
+
+        spy_data['day_of_week'] = spy_data.index.dayofweek
+        spy_data['hour'] = spy_data.index.hour
+        spy_data['minute'] = spy_data.index.minute
+        spy_data['hour_sin'] = np.sin(2 * np.pi * spy_data['hour'] / 24)
+        spy_data['hour_cos'] = np.cos(2 * np.pi * spy_data['hour'] / 24)
+        spy_data['minute_sin'] = np.sin(2 * np.pi * spy_data['minute'] / 60)
+        spy_data['minute_cos'] = np.cos(2 * np.pi * spy_data['minute'] / 60)
+
+        combined_data.append(spy_data)
+
+    if not combined_data:
+        logger.error("No valid SPY data available for the specified timeframes.")
+        return None, None, None, None
+
+    all_timeframes_data = pd.concat(combined_data)
+    features = all_timeframes_data.drop(columns=['Close', 'datetime'], errors='ignore').select_dtypes(include=[np.number])
+    target = all_timeframes_data['Close']
+
+    X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, random_state=42)
+    return X_train, X_test, y_train, y_test
+
+# Model hypertuning functions
+def hypertune_random_forest(X_train, y_train):
+    rf_grid = {'n_estimators': [100, 200, 300], 'max_depth': [10, 20, None],
+               'min_samples_split': [2, 5, 10], 'min_samples_leaf': [1, 2, 4], 'max_features': ['sqrt', 'log2']}
+    rf = RandomForestRegressor()
+    rf_cv = GridSearchCV(estimator=rf, param_grid=rf_grid, cv=3, scoring='neg_mean_squared_error')
+    rf_cv.fit(X_train, y_train)
+    logger.info(f"Best parameters for RandomForest: {rf_cv.best_params_}")
+    return rf_cv.best_params_
+
+def hypertune_xgboost(X_train, y_train):
+    xgb_grid = {'n_estimators': [100, 200, 300], 'learning_rate': [0.01, 0.1, 0.2], 
+                'max_depth': [3, 5, 7], 'min_child_weight': [1, 3, 5], 'gamma': [0, 0.1, 0.3]}
+    xgboost = xgb.XGBRegressor()
+    xgb_cv = GridSearchCV(estimator=xgboost, param_grid=xgb_grid, cv=3, scoring='neg_mean_squared_error')
+    xgb_cv.fit(X_train, y_train)
+    logger.info(f"Best parameters for XGBoost: {xgb_cv.best_params_}")
+    return xgb_cv.best_params_
+
+def hypertune_gradient_boosting(X_train, y_train):
+    gb_grid = {'n_estimators': [100, 200, 300], 'learning_rate': [0.01, 0.1, 0.2],
+               'max_depth': [3, 5, 7], 'min_samples_split': [2, 5, 10], 'min_samples_leaf': [1, 2, 4]}
+    gb = GradientBoostingRegressor()
+    gb_cv = GridSearchCV(estimator=gb, param_grid=gb_grid, cv=3, scoring='neg_mean_squared_error')
+    gb_cv.fit(X_train, y_train)
+    logger.info(f"Best parameters for Gradient Boosting: {gb_cv.best_params_}")
+    return gb_cv.best_params_
+
+# LSTM hypertuning
+# LSTM hypertuning with corrected dropout parameter handling
+def build_lstm_model(units=50, dropout=0.2, learning_rate=0.01, input_shape=(1, 1)):
     model = Sequential()
-    model.add(LSTM(units=units, return_sequences=True, input_shape=(X_train.shape[1], X_train.shape[2])))
-    model.add(Dropout(dropout))
+    model.add(LSTM(units=units, return_sequences=True, input_shape=input_shape))
+    model.add(Dropout(dropout))  # Correct dropout parameter usage here
     model.add(LSTM(units=units))
     model.add(Dense(1))
     optimizer = Adam(learning_rate=learning_rate)
@@ -160,58 +112,54 @@ def build_lstm_model(units=50, dropout=0.2, learning_rate=0.01):
 
 def hypertune_lstm(X_train, y_train):
     print("Tuning LSTM...")
-    lstm = KerasRegressor(build_fn=build_lstm_model, epochs=50, batch_size=32, verbose=0)
+    
+    try:
+        # Define KerasRegressor with model parameters to handle dropout internally
+        lstm = KerasRegressor(
+            model=build_lstm_model,
+            model__input_shape=(X_train.shape[1], 1)  # Pass input_shape as part of model parameters
+        )
+        
+        # Correctly specify parameters for GridSearchCV using 'model__' prefix
+        lstm_grid = {
+            'model__units': [50, 100, 150],
+            'model__dropout': [0.2, 0.3, 0.4],  # Change to 'model__dropout'
+            'model__learning_rate': [0.001, 0.01, 0.02],
+            'batch_size': [32, 64, 128],
+            'epochs': [50, 100]
+        }
 
-    lstm_grid = {
-        'units': [50, 100, 150],
-        'dropout': [0.2, 0.3, 0.4],
-        'learning_rate': [0.001, 0.01, 0.02],
-        'batch_size': [32, 64, 128],
-        'epochs': [50, 100]
+        lstm_cv = GridSearchCV(estimator=lstm, param_grid=lstm_grid, cv=3, scoring='neg_mean_squared_error')
+        lstm_cv.fit(X_train, y_train)
+        
+        logger.info(f"Best parameters for LSTM: {lstm_cv.best_params_}")
+        
+        # Return the best estimator
+        return lstm_cv.best_estimator_
+    
+    except Exception as e:
+        logger.error(f"Error in LSTM hypertuning: {e}")
+        return None
+
+# Main function
+def main():
+    X_train, X_test, y_train, y_test = prepare_data()
+
+    best_params = {
+        'RandomForest': hypertune_random_forest(X_train, y_train),
+        'XGBoost': hypertune_xgboost(X_train, y_train),
+        'GradientBoosting': hypertune_gradient_boosting(X_train, y_train),
+        'LSTM': hypertune_lstm(X_train, y_train)
     }
 
-    lstm_cv = GridSearchCV(estimator=lstm, param_grid=lstm_grid, cv=3, scoring='neg_mean_squared_error')
-    lstm_cv.fit(X_train, y_train)
+    # Save all best parameters in a single file
+    with open('best_params.pkl', 'wb') as f:
+        pickle.dump(best_params, f)
+    logger.info("Best parameters saved to best_params.pkl")
 
-    print("Best parameters for LSTM:", lstm_cv.best_params_)
-    return lstm_cv.best_estimator_
+    # Model evaluation summary
+    for model_name, params in best_params.items():
+        logger.info(f"{model_name} best parameters: {params}")
 
-# Evaluate model performance using MAE and RMSE
-def evaluate_model(model, X_test, y_test):
-    predictions = model.predict(X_test)
-    mae = mean_absolute_error(y_test, predictions)
-    rmse = mean_squared_error(y_test, predictions, squared=False)
-    return mae, rmse
-
-# Main hypertuning and evaluation process
-X_train, X_test, y_train, y_test = prepare_data()
-
-# Hypertune RandomForest, XGBoost, GradientBoosting, and LSTM
-rf_model = hypertune_random_forest(X_train, y_train)
-xgb_model = hypertune_xgboost(X_train, y_train)
-gb_model = hypertune_gradient_boosting(X_train, y_train)
-lstm_model = hypertune_lstm(X_train, y_train)
-
-# Evaluate each model's performance
-rf_mae, rf_rmse = evaluate_model(rf_model, X_test, y_test)
-xgb_mae, xgb_rmse = evaluate_model(xgb_model, X_test, y_test)
-gb_mae, gb_rmse = evaluate_model(gb_model, X_test, y_test)
-
-# LSTM evaluation needs special handling due to its Keras structure
-lstm_mae, lstm_rmse = evaluate_model(lstm_model, X_test, y_test)
-
-# Store and display the results for comparison
-results = pd.DataFrame({
-    'Model': ['RandomForest', 'XGBoost', 'GradientBoosting', 'LSTM'],
-    'MAE': [rf_mae, xgb_mae, gb_mae, lstm_mae],
-    'RMSE': [rf_rmse, xgb_rmse, gb_rmse, lstm_rmse]
-})
-
-print("Model Evaluation Results:")
-print(results)
-
-# Select the best model based on RMSE or MAE
-best_model_idx = results['RMSE'].idxmin()  # Change to 'MAE' if you prefer MAE
-best_model_name = results.iloc[best_model_idx]['Model']
-print(f"The best performing model is {best_model_name} with RMSE: {results.iloc[best_model_idx]['RMSE']}")
-
+if __name__ == "__main__":
+    main()
