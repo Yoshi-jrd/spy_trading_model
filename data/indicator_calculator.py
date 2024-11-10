@@ -13,8 +13,7 @@ def calculate_indicators(df):
     df['MACD'] = df['EMA12'] - df['EMA26']
     df['MACD_Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
     df['MACD_Histogram'] = df['MACD'] - df['MACD_Signal']
-
-    # Print for validation of MACD values
+    
     print("\n--- MACD Histogram (Key Momentum Indicator) ---")
     print(df[['MACD', 'MACD_Signal', 'MACD_Histogram']].head())
 
@@ -26,11 +25,19 @@ def calculate_indicators(df):
     avg_loss = loss.rolling(window=14).mean()
     rs = avg_gain / avg_loss
     df['RSI'] = 100 - (100 / (1 + rs))
+    
+    # Ensure no division by zero in RSI calculation
+    df['RSI'].fillna(0, inplace=True)
+    if (df['RSI'] == 0).all():
+        print("Warning: All RSI values are zero.")
 
     # Bollinger Bands for volatility analysis
     df['SMA20'] = df['Close'].rolling(window=20).mean()
     df['UpperBand'] = df['SMA20'] + 2 * df['Close'].rolling(window=20).std()
     df['LowerBand'] = df['SMA20'] - 2 * df['Close'].rolling(window=20).std()
+    
+    print("\n--- Bollinger Bands ---")
+    print(df[['SMA20', 'UpperBand', 'LowerBand']].head())
 
     # ATR - Average True Range for volatility assessment
     df['PrevClose'] = df['Close'].shift(1)
@@ -38,6 +45,11 @@ def calculate_indicators(df):
         lambda row: max(row['High'] - row['Low'], abs(row['High'] - row['PrevClose']), abs(row['Low'] - row['PrevClose'])), axis=1
     )
     df['ATR'] = df['TR'].rolling(window=14).mean()
+    
+    print("\n--- ATR Calculation ---")
+    print(df[['TR', 'ATR']].head())
+    if (df['ATR'] == 0).all():
+        print("Warning: All ATR values are zero.")
 
     # ADX - Trend strength indicator
     plus_dm = df['High'].diff().clip(lower=0)
@@ -49,11 +61,18 @@ def calculate_indicators(df):
     df['MinusDI'] = 100 * (minus_dm14 / tr14)
     df['ADX'] = 100 * (abs(df['PlusDI'] - df['MinusDI']) / (df['PlusDI'] + df['MinusDI'])).rolling(window=14).mean()
 
+    # Handle potential NaNs or zeros in ADX calculations
+    df['ADX'].fillna(0, inplace=True)
+    if (df['ADX'] == 0).all():
+        print("Warning: All ADX values are zero.")
+    
+    print("\n--- ADX Calculation ---")
+    print(df[['PlusDI', 'MinusDI', 'ADX']].head())
+
     # EMA Crossovers - For trend direction
     df['EMA9'] = df['Close'].ewm(span=9, adjust=False).mean()
     df['EMA21'] = df['Close'].ewm(span=21, adjust=False).mean()
-
-    # Print for EMA crossover verification
+    
     print("\n--- EMA Crossovers Preview ---")
     print(df[['EMA9', 'EMA21']].head())
 
@@ -63,7 +82,12 @@ def calculate_indicators(df):
     pos_mf = mf.where(tp > tp.shift(1), 0).rolling(window=14).sum()
     neg_mf = mf.where(tp < tp.shift(1), 0).rolling(window=14).sum()
     df['MFI'] = 100 - (100 / (1 + pos_mf / neg_mf))
-
+    
+    # Handle NaN in MFI and verify values
+    df['MFI'].fillna(0, inplace=True)
+    if (df['MFI'] == 0).all():
+        print("Warning: All MFI values are zero.")
+    
     # Impulse MACD and RSI - LazyBear (Key for bullish/bearish conditions)
     df['Impulse_MACD'] = df['MACD']
     df['Impulse_RSI'] = df['RSI']

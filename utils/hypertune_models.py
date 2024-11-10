@@ -8,11 +8,12 @@ import xgboost as xgb
 import pickle
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.metrics import mean_squared_error
 from keras.models import Sequential
-from keras.layers import LSTM, Dense, Dropout
+from keras.layers import LSTM, Dense, Dropout, Input
 from keras.optimizers import Adam
 from scikeras.wrappers import KerasRegressor
+from keras.callbacks import EarlyStopping
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -67,7 +68,19 @@ def prepare_data(timeframes=['5m', '15m', '1h', '1d']):
     features = all_timeframes_data.drop(columns=['Close', 'datetime'], errors='ignore').select_dtypes(include=[np.number])
     target = all_timeframes_data['Close']
 
+    # Handle NaNs in the feature set
+    features = features.ffill().bfill()  # Forward and backward fill
+    target = target.ffill().bfill()  # Forward and backward fill
+
+    # Split data for training/testing
     X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, random_state=42)
+    
+    # Confirm there are no NaNs after filling
+    if X_train.isna().sum().sum() > 0 or y_train.isna().sum() > 0:
+        logger.error("NaN values remain in the training data after filling.")
+    else:
+        logger.info("NaN handling complete; no NaNs present in training data.")
+
     return X_train, X_test, y_train, y_test
 
 # Model hypertuning functions
@@ -95,48 +108,48 @@ def hypertune_gradient_boosting(X_train, y_train):
     gb = GradientBoostingRegressor()
     gb_cv = GridSearchCV(estimator=gb, param_grid=gb_grid, cv=3, scoring='neg_mean_squared_error')
     gb_cv.fit(X_train, y_train)
-    logger.info(f"Best parameters for Gradient Boosting: {gb_cv.best_params_}")
+    logger.info(f"Best parameters for GradientBoosting: {gb_cv.best_params_}")
     return gb_cv.best_params_
 
 # LSTM hypertuning
-# LSTM hypertuning with corrected dropout parameter handling
 def build_lstm_model(units=50, dropout=0.2, learning_rate=0.01, input_shape=(1, 1)):
-    model = Sequential()
-    model.add(LSTM(units=units, return_sequences=True, input_shape=input_shape))
-    model.add(Dropout(dropout))  # Correct dropout parameter usage here
-    model.add(LSTM(units=units))
-    model.add(Dense(1))
+    model = Sequential([
+        Input(shape=input_shape),
+        LSTM(units=units, return_sequences=True),
+        Dropout(dropout),
+        LSTM(units=units),
+        Dense(1)
+    ])
     optimizer = Adam(learning_rate=learning_rate)
     model.compile(optimizer=optimizer, loss='mean_squared_error')
     return model
 
 def hypertune_lstm(X_train, y_train):
     print("Tuning LSTM...")
-    
+
     try:
-        # Define KerasRegressor with model parameters to handle dropout internally
         lstm = KerasRegressor(
             model=build_lstm_model,
-            model__input_shape=(X_train.shape[1], 1)  # Pass input_shape as part of model parameters
+            model__input_shape=(X_train.shape[1], 1)
         )
         
-        # Correctly specify parameters for GridSearchCV using 'model__' prefix
+        # Define the parameter grid for GridSearchCV
         lstm_grid = {
             'model__units': [50, 100, 150],
-            'model__dropout': [0.2, 0.3, 0.4],  # Change to 'model__dropout'
+            'model__dropout': [0.2, 0.3, 0.4],
             'model__learning_rate': [0.001, 0.01, 0.02],
             'batch_size': [32, 64, 128],
-            'epochs': [50, 100]
+            'epochs': [50]
         }
 
-        lstm_cv = GridSearchCV(estimator=lstm, param_grid=lstm_grid, cv=3, scoring='neg_mean_squared_error')
+        # Use GridSearchCV to find the best hyperparameters
+        lstm_cv = GridSearchCV(estimator=lstm, param_grid=lstm_grid, cv=3, scoring='neg_mean_squared_error', verbose=2)
         lstm_cv.fit(X_train, y_train)
-        
-        logger.info(f"Best parameters for LSTM: {lstm_cv.best_params_}")
-        
-        # Return the best estimator
-        return lstm_cv.best_estimator_
-    
+
+        best_params = lstm_cv.best_params_
+        logger.info(f"Best parameters for LSTM: {best_params} with loss: {-lstm_cv.best_score_}")
+        return best_params
+
     except Exception as e:
         logger.error(f"Error in LSTM hypertuning: {e}")
         return None
@@ -145,14 +158,20 @@ def hypertune_lstm(X_train, y_train):
 def main():
     X_train, X_test, y_train, y_test = prepare_data()
 
-    best_params = {
-        'RandomForest': hypertune_random_forest(X_train, y_train),
-        'XGBoost': hypertune_xgboost(X_train, y_train),
-        'GradientBoosting': hypertune_gradient_boosting(X_train, y_train),
-        'LSTM': hypertune_lstm(X_train, y_train)
-    }
+    # Load existing best parameters if they exist
+    try:
+        with open('best_params.pkl', 'rb') as f:
+            best_params = pickle.load(f)
+    except (FileNotFoundError, EOFError):
+        best_params = {}
 
-    # Save all best parameters in a single file
+    # Hypertune each model and update best_params if run
+    # best_params['RandomForest'] = hypertune_random_forest(X_train, y_train)  # Uncomment to run
+    # best_params['XGBoost'] = hypertune_xgboost(X_train, y_train)  # Uncomment to run
+    # best_params['GradientBoosting'] = hypertune_gradient_boosting(X_train, y_train)  # Uncomment to run
+    best_params['LSTM'] = hypertune_lstm(X_train, y_train)
+
+    # Save updated best parameters back to the file
     with open('best_params.pkl', 'wb') as f:
         pickle.dump(best_params, f)
     logger.info("Best parameters saved to best_params.pkl")

@@ -1,77 +1,65 @@
-import sys
-import os
-
-# Add the parent directory to the system path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+# backtest.py
 import numpy as np
 import pandas as pd
-import xgboost as xgb
-from data.data_loader import load_data
-from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import accuracy_score, precision_score, recall_score
-from sklearn.preprocessing import StandardScaler
-from models.random_forest import MarketSentimentClassifier
-from sklearn.model_selection import train_test_split
+import pickle
+import matplotlib.pyplot as plt
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from models.train_models import load_best_params, evaluate_model
+from model_utils import compute_confidence_interval
+from data.data_loader import load_existing_data
 
-def backtest_model():
-    # Load the SPY data using the data loader
-    data = load_data()
+# Load historical data
+data = load_existing_data()
+spy_data = data['spy_data']
 
-    # Access the 1-hour timeframe data from 'spy_data'
-    spy_data_df = data['spy_data']['1d']
+# Define the forward timeframes (in hours) to predict
+forward_hours = [12, 24, 36, 48, 72, 96]
 
-    # Check if 'Sentiment' exists in the DataFrame
-    if 'Sentiment' not in spy_data_df.columns:
-        # Calculate Sentiment based on EMA crossover
-        threshold = 0.1  # Neutral threshold
-        spy_data_df['Sentiment'] = np.where(spy_data_df['EMA9'] > spy_data_df['EMA21'] + threshold, 1, 
-                                            np.where(spy_data_df['EMA9'] < spy_data_df['EMA21'] - threshold, 0, 2))
+# Main Backtest Functionality
+for timeframe, spy_df in spy_data.items():
+    print(f"\nRunning backtest for {timeframe} timeframe")
 
-    # Prepare features and labels
-    X = spy_data_df[['MACD', 'RSI', '%K', '%D', 'ATR', 'PlusDI', 'MinusDI', 'EMA9', 'EMA21', 'MFI']]
-    y = spy_data_df['Sentiment']  # Use the 'Sentiment' column as the labels
+    # Extract features and initialize results storage
+    X = spy_df[['MACD_Histogram', 'RSI', 'UpperBand', 'LowerBand', 'ATR', 'ADX', 'EMA9', 'EMA21', 'Impulse_Color']].values
+    predictions_summary = {}
 
-    # Normalize the features
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-    
-    # TimeSeriesSplit for backtesting
-    tscv = TimeSeriesSplit(n_splits=5)
+    # Loop through each forward timeframe and predict
+    for hours in forward_hours:
+        y = spy_df['Close'].shift(-hours).dropna().values  # Shift target to create forward prediction
+        X_adj = X[:len(y)]  # Align X with shifted target
 
-    accuracy_scores = []
-    precision_scores = []
-    recall_scores = []
+        # Split data into train and validation sets
+        X_train, X_val, y_train, y_val = train_test_split(X_adj, y, test_size=0.2, random_state=42)
 
-    for train_index, test_index in tscv.split(X_scaled):
-        # Split the data into training and testing sets based on time
-        X_train, X_test = X_scaled[train_index], X_scaled[test_index]
-        y_train, y_test = y.iloc[train_index], y.iloc[test_index]  # Use .iloc to access the correct rows
+        # Load model, predict, and calculate confidence intervals
+        predictions, lower_bound, upper_bound = make_predictions(X_val, best_params)
+        mae, rmse = evaluate_model(y_val, predictions)
         
-        # Train the model
-        classifier = MarketSentimentClassifier()
-        classifier.train(X_train, y_train)
+        within_conf = np.mean((y_val >= lower_bound) & (y_val <= upper_bound))
+        predictions_summary[hours] = {
+            'predictions': predictions,
+            'lower_bound': lower_bound,
+            'upper_bound': upper_bound,
+            'actual': y_val,
+            'mae': mae,
+            'rmse': rmse,
+            'within_confidence': within_conf
+        }
 
-        # Make predictions
-        y_pred = classifier.predict(X_test)
+    # Plotting results for each forward timeframe
+    fig, axs = plt.subplots(2, 3, figsize=(18, 12))
+    fig.suptitle(f"Multi-Timeframe Forward Predictions Backtest for {timeframe}")
 
-        # Calculate performance metrics
-        accuracy = accuracy_score(y_test, y_pred)
-        precision = precision_score(y_test, y_pred, average='weighted', zero_division=1)
-        recall = recall_score(y_test, y_pred, average='weighted')
+    for idx, hours in enumerate(forward_hours):
+        ax = axs[idx // 3, idx % 3]
+        summary = predictions_summary[hours]
+        
+        ax.plot(summary['actual'], label="Actual Price", color="black")
+        ax.plot(summary['predictions'], label=f"Predicted Price ({hours}h)", color="blue")
+        ax.fill_between(range(len(summary['predictions'])), summary['lower_bound'], summary['upper_bound'], color="blue", alpha=0.2, label="75% Confidence Interval")
+        
+        ax.set_title(f"{hours}-Hour Forward Prediction\nMAE: {summary['mae']:.2f}, RMSE: {summary['rmse']:.2f}, % Within CI: {summary['within_confidence']*100:.2f}%")
+        ax.legend()
 
-        accuracy_scores.append(accuracy)
-        precision_scores.append(precision)
-        recall_scores.append(recall)
-
-        print(f"Accuracy: {accuracy}, Precision: {precision}, Recall: {recall}")
-
-    # Average metrics over all splits
-    avg_accuracy = sum(accuracy_scores) / len(accuracy_scores)
-    avg_precision = sum(precision_scores) / len(precision_scores)
-    avg_recall = sum(recall_scores) / len(recall_scores)
-
-    print(f"\nBacktesting Results:\nAverage Accuracy: {avg_accuracy}\nAverage Precision: {avg_precision}\nAverage Recall: {avg_recall}")
-
-# Call the backtesting function
-backtest_model()
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.show()

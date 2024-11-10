@@ -1,143 +1,169 @@
-# Import necessary modules
 import os
 import sys
+import csv
 import pickle
 import numpy as np
-from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split, KFold
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+from scikeras.wrappers import KerasRegressor
+import logging
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Import models and utilities
 from random_forest_model import train_random_forest
 from xgboost_model import train_xgboost
 from gradient_boosting_model import train_gradient_boosting
-from lstm_model import build_lstm_model, train_lstm
-from model_utils import evaluate_model
+from lstm_model import build_lstm_model
+from model_utils import compute_confidence_interval
 from data.data_loader import load_existing_data
 from data.indicator_calculator import calculate_indicators
-from sklearn.ensemble import RandomForestRegressor
-from scikeras.wrappers import KerasRegressor
+from evaluate_model import evaluate_model  # Importing evaluate_model for model evaluation
 
-# Define paths for the best parameters file and model save path
+# Setup logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
+# Paths
 best_params_file = "best_params.pkl"
 model_save_dir = "saved_models"
-
-# Ensure the model save directory exists
 os.makedirs(model_save_dir, exist_ok=True)
 
-# Helper function to load best parameters
+# Load best parameters
 def load_best_params():
     if os.path.exists(best_params_file):
         try:
             with open(best_params_file, 'rb') as f:
                 return pickle.load(f)
         except EOFError:
-            print("Warning: best_params.pkl is empty or corrupted. Resetting to default parameters.")
+            logger.warning("best_params.pkl is empty or corrupted. Using default parameters.")
     return {
         'RandomForest': {'n_estimators': 200, 'max_depth': 20, 'min_samples_split': 2, 'min_samples_leaf': 1, 'max_features': 'sqrt'},
         'XGBoost': {'n_estimators': 100, 'learning_rate': 0.2, 'max_depth': 3, 'min_child_weight': 3, 'gamma': 0},
-        'GradientBoosting': {'n_estimators': 300, 'learning_rate': 0.1, 'max_depth': 3, 'min_samples_split': 10, 'min_samples_leaf': 1}
+        'GradientBoosting': {'n_estimators': 300, 'learning_rate': 0.1, 'max_depth': 3, 'min_samples_split': 10, 'min_samples_leaf': 1},
+        'LSTM': {'model__units': 100, 'model__dropout': 0.2, 'model__learning_rate': 0.01, 'batch_size': 32, 'epochs': 50}
     }
 
-# Helper function to save best parameters
+# Save best parameters
 def save_best_params(best_params):
     with open(best_params_file, 'wb') as f:
         pickle.dump(best_params, f)
 
-# Load best parameters and initialize best RMSE tracker
-best_params = load_best_params()
-best_rmse = {'RandomForest': float('inf'), 'XGBoost': float('inf'), 'GradientBoosting': float('inf'), 'LSTM': float('inf')}
+# Train and evaluate a model with logging and confidence interval output
+def train_and_evaluate_model(model, X_train, y_train, X_val, y_val, model_name, timeframe):
+    kf = KFold(n_splits=5, shuffle=True, random_state=42)
+    mae, rmse, conf_intervals = [], [], []
 
-# Load the data
+    for train_index, val_index in kf.split(X_train):
+        X_fold_train, X_fold_val = X_train.iloc[train_index], X_train.iloc[val_index]
+        y_fold_train, y_fold_val = y_train.iloc[train_index], y_train.iloc[val_index]
+        model.fit(X_fold_train, y_fold_train)
+        predictions = model.predict(X_fold_val)
+        
+        # Evaluate and log performance
+        fold_mae, fold_rmse = evaluate_model(y_fold_val, predictions)
+        fold_lower, fold_upper = compute_confidence_interval(predictions, confidence_level=0.75)
+        mae.append(fold_mae)
+        rmse.append(fold_rmse)
+        conf_intervals.append((fold_lower, fold_upper))
+    
+    avg_mae, avg_rmse = np.mean(mae), np.mean(rmse)
+    lower, upper = np.mean([ci[0] for ci in conf_intervals]), np.mean([ci[1] for ci in conf_intervals])
+    logger.info(f"{model_name} - {timeframe}-hour Forward - MAE: {avg_mae}, RMSE: {avg_rmse}, CI: ({lower}, {upper})")
+    return avg_mae, avg_rmse, lower, upper
+
+# Initialize best parameters and load data
+best_params = load_best_params()
 data = load_existing_data()
 spy_data = data['spy_data']
 
-# Function to update best parameters dynamically and save models
-def update_best_params_and_save_model(model_name, model, current_rmse, current_params):
-    global best_rmse, best_params
-    if current_rmse < best_rmse[model_name]:
-        print(f"New best RMSE for {model_name}: {current_rmse}. Updating best parameters and saving model...")
-        best_rmse[model_name] = current_rmse
-        best_params[model_name] = current_params
-        model_save_path = os.path.join(model_save_dir, f"{model_name}_{timeframe}_model.pkl")
-        with open(model_save_path, 'wb') as f:
-            pickle.dump(model, f)
+# Timeframes for multiple forward predictions
+timeframes = [12, 24, 36, 48, 72, 96]
 
-# Training loop for each timeframe in SPY data
-for timeframe, spy_df in spy_data.items():
-    print(f"\n--- Training models on {timeframe} timeframe ---")
-    spy_df = calculate_indicators(spy_df)
+# Training and Evaluation Loop
+predictions_summary = []  # Store predictions for visualization
+for timeframe in timeframes:
+    for tf_name, spy_df in spy_data.items():
+        logger.info(f"Training models on {tf_name} timeframe for {timeframe}-hour forward prediction")
+        spy_df = calculate_indicators(spy_df)
+        spy_df['Impulse_Color'] = spy_df['Impulse_Color'].map({'red': -1, 'green': 1, 'gray': 0})
 
-    # Convert 'Impulse_Color' to numeric values for model training
-    color_mapping = {'red': -1, 'green': 1, 'gray': 0}
-    spy_df['Impulse_Color'] = spy_df['Impulse_Color'].map(color_mapping)
+        # Feature and Target Setup, including augmented feature if available
+        selected_features = ['MACD_Histogram', 'RSI', 'UpperBand', 'LowerBand', 'ATR', 'ADX', 'EMA9', 'EMA21', 'Impulse_Color']
+        if 'Close_augmented' in spy_df.columns:
+            selected_features.append('Close_augmented')
+        X = spy_df[selected_features]
+        y = spy_df['Close'].shift(-timeframe).dropna()  # Target shifted by `timeframe` steps
+        X = X.iloc[:-timeframe]  # Align features with shifted target
+        
+        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+        
+        # RandomForest Model Training
+        rf_model = RandomForestRegressor(**best_params['RandomForest'])
+        rf_mae, rf_rmse, rf_lower, rf_upper = train_and_evaluate_model(
+            rf_model, X_train, y_train, X_val, y_val, "RandomForest", timeframe)
 
-    # Filter columns to include only prioritized indicators
-    selected_features = ['MACD_Histogram', 'RSI', 'UpperBand', 'LowerBand', 'ATR', 'ADX', 'EMA9', 'EMA21', 'Impulse_Color']
-    X = spy_df[selected_features]
-    y = spy_df['Close']
-    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+        # XGBoost Model Training
+        xgb_model = train_xgboost(X_train, y_train, **best_params['XGBoost'])
+        xgb_mae, xgb_rmse, xgb_lower, xgb_upper = train_and_evaluate_model(
+            xgb_model, X_train, y_train, X_val, y_val, "XGBoost", timeframe)
 
-    # Debugging: Check columns in X_train to confirm selected features
-    print(f"Selected features for training: {X_train.columns}")
+        # Gradient Boosting Model Training
+        gb_model = train_gradient_boosting(X_train, y_train, **best_params['GradientBoosting'])
+        gb_mae, gb_rmse, gb_lower, gb_upper = train_and_evaluate_model(
+            gb_model, X_train, y_train, X_val, y_val, "GradientBoosting", timeframe)
 
-    # -----------------------------
-    # Train and Hypertune each model
-    # -----------------------------
+        # LSTM Model Training
+        try:
+            X_train_reshaped = X_train.values.reshape((X_train.shape[0], 1, X_train.shape[1]))
+            X_val_reshaped = X_val.values.reshape((X_val.shape[0], 1, X_val.shape[1]))
+            
+            lstm_params = best_params.get('LSTM', {})
+            lstm_model = KerasRegressor(
+                model=build_lstm_model,
+                model__input_shape=(1, X_train.shape[1]),
+                model__units=lstm_params.get('model__units', 100),
+                model__dropout=lstm_params.get('model__dropout', 0.2),
+                model__learning_rate=lstm_params.get('model__learning_rate', 0.01),
+                batch_size=lstm_params.get('batch_size', 32),
+                epochs=lstm_params.get('epochs', 50),
+                verbose=0
+            )
+            lstm_model.fit(X_train_reshaped, y_train)
+            lstm_predictions = lstm_model.predict(X_val_reshaped).flatten()
+            lstm_lower, lstm_upper = compute_confidence_interval(lstm_predictions, confidence_level=0.75)
+        except Exception as e:
+            logger.error(f"Error training LSTM model on {tf_name} timeframe: {e}")
 
-    # RandomForest Model
-    print(f"Training RandomForest Model on {timeframe} timeframe...")
-    rf_model = RandomForestRegressor(**best_params['RandomForest'])
-    rf_model.fit(X_train, y_train)
-    rf_val_predictions = rf_model.predict(X_val)
-    rf_mae, rf_rmse = evaluate_model(y_val, rf_val_predictions)
-    print(f"RandomForest - {timeframe} - MAE: {rf_mae}, RMSE: {rf_rmse}")
-    update_best_params_and_save_model('RandomForest', rf_model, rf_rmse, rf_model.get_params())
+        # Model Stacking with Meta-Model
+        meta_X_train = np.column_stack([rf_mae, xgb_mae, gb_mae, lstm_predictions])
+        meta_y_train = y_val
+        meta_model = LinearRegression().fit(meta_X_train, meta_y_train)
+        stacked_predictions = meta_model.predict(meta_X_train)
 
-    # XGBoost Model
-    print(f"Training XGBoost Model on {timeframe} timeframe...")
-    xgb_model = train_xgboost(X_train, y_train, **best_params['XGBoost'])
-    xgb_val_predictions = xgb_model.predict(X_val)
-    xgb_mae, xgb_rmse = evaluate_model(y_val, xgb_val_predictions)
-    print(f"XGBoost - {timeframe} - MAE: {xgb_mae}, RMSE: {xgb_rmse}")
-    update_best_params_and_save_model('XGBoost', xgb_model, xgb_rmse, xgb_model.get_params())
+        # Write training results to CSV
+        with open('model_training_results.csv', mode='a') as file:
+            writer = csv.writer(file)
+            writer.writerow(["Stacked Model", timeframe, np.mean(stacked_predictions), rf_lower, rf_upper])
 
-    # Gradient Boosting Model
-    print(f"Training Gradient Boosting Model on {timeframe} timeframe...")
-    gb_model = train_gradient_boosting(X_train, y_train, **best_params['GradientBoosting'])
-    gb_val_predictions = gb_model.predict(X_val)
-    gb_mae, gb_rmse = evaluate_model(y_val, gb_val_predictions)
-    print(f"GradientBoosting - {timeframe} - MAE: {gb_mae}, RMSE: {gb_rmse}")
-    update_best_params_and_save_model('GradientBoosting', gb_model, gb_rmse, gb_model.get_params())
-
-# LSTM Model
-print(f"Training LSTM Model on {timeframe} timeframe...")
-try:
-    # Determine input shape for LSTM
-    X_train_reshaped = X_train.values.reshape((X_train.shape[0], 1, X_train.shape[1]))
-    X_val_reshaped = X_val.values.reshape((X_val.shape[0], 1, X_val.shape[1]))
-    input_shape = (X_train_reshaped.shape[1], X_train_reshaped.shape[2])
-
-    # Debugging shapes for LSTM input validation
-    print(f"X_train reshaped for LSTM: {X_train_reshaped.shape}")
-    print(f"X_val reshaped for LSTM: {X_val_reshaped.shape}")
-
-    # Initialize LSTM model
-    lstm_model = KerasRegressor(
-        model=build_lstm_model,
-        model__input_shape=input_shape,
-        epochs=50,
-        batch_size=32,
-        verbose=0
-    )
-
-    # Train and evaluate the LSTM model
-    lstm_model.fit(X_train_reshaped, y_train)
-    lstm_val_predictions = lstm_model.predict(X_val_reshaped).flatten()
-    lstm_mae, lstm_rmse = evaluate_model(y_val, lstm_val_predictions)
-    print(f"LSTM - {timeframe} - MAE: {lstm_mae}, RMSE: {lstm_rmse}")
-    update_best_params_and_save_model('LSTM', lstm_model, lstm_rmse, lstm_model.get_params())
-except Exception as e:
-    print(f"Error training LSTM model on {timeframe}: {e}")
-
-# Save best parameters after training
+# Save updated best parameters
 save_best_params(best_params)
+
+# Visualization: Plot predictions with confidence intervals and actual values
+plt.figure(figsize=(14, 10))
+for idx, (predictions, lower, upper, actual, model_name, timeframe) in enumerate(predictions_summary, 1):
+    plt.subplot(3, 2, idx)
+    plt.plot(actual.index, actual, label="Actual Price", color='black')
+    plt.plot(actual.index, predictions, label="Predicted Price", color='blue')
+    plt.fill_between(actual.index, lower, upper, color='blue', alpha=0.2, label="75% Confidence Interval")
+    plt.title(f"{model_name} Predictions vs Actual ({timeframe}-hour forecast)")
+    plt.xlabel("Date")
+    plt.ylabel("SPY Price")
+    plt.legend()
+    if idx >= 6:
+        break  # Limit to 6 plots to keep visualization clear
+
+plt.tight_layout()
+plt.show()

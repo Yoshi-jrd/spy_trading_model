@@ -2,116 +2,75 @@ import os
 import sys
 import pickle
 from datetime import datetime
+import numpy as np
 import pandas as pd
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data.market_data_loader import load_spy_multi_timeframes, get_vix_futures, get_all_iv
 from data.economic_data_loader import load_economic_data
 from data.sentiment_data_loader import get_news_sentiment
+from data.indicator_calculator import calculate_indicators
 
 def import_data():
     """
     Import data from different sources: SPY, VIX, IV, GDP, CPI, Sentiment, and Articles.
     """
     print("Starting data import...")
-
     spy_data = load_spy_multi_timeframes()
     vix_data = get_vix_futures()
     iv_data = get_all_iv()
     gdp_data, cpi_data = load_economic_data()
     sentiment_data, articles = get_news_sentiment()
 
-    print("\n--- Imported Data Preview ---")
-    print("SPY data keys (timeframes):", spy_data.keys())
-    print("VIX data columns:", vix_data.columns)
-    print("IV data columns:", iv_data.columns)
-    print("GDP data shape:", gdp_data.shape)
-    print("CPI data shape:", cpi_data.shape)
-    
-    if isinstance(sentiment_data, pd.DataFrame):
-        print("Sentiment data preview:", sentiment_data.head())
-    else:
-        print("Sentiment data value:", sentiment_data)
-    
-    if isinstance(articles, pd.DataFrame):
-        print("Articles preview:", articles.head())
-    else:
-        print("Articles:", articles)
+    print("\n--- Data Import Overview ---")
+    print("SPY timeframes:", list(spy_data.keys()))
+    print("VIX columns:", vix_data.columns)
+    print("IV columns:", iv_data.columns)
+    print(f"GDP data shape: {gdp_data.shape}, CPI data shape: {cpi_data.shape}")
+    print("Sentiment data:", sentiment_data if isinstance(sentiment_data, pd.DataFrame) else f"Value: {sentiment_data}")
+    print("Articles data:", articles.head() if isinstance(articles, pd.DataFrame) else articles)
 
     return spy_data, vix_data, iv_data, gdp_data, cpi_data, sentiment_data, articles
 
 def ensure_datetime(df, possible_col_names):
     """
-    Ensure that the DataFrame has a consistent 'datetime' column.
+    Ensure the DataFrame has a 'datetime' column.
     """
-    found_col = None
     for col_name in possible_col_names:
         if col_name in df.columns:
-            found_col = col_name
-            break
-
-    if found_col:
-        df['datetime'] = pd.to_datetime(df[found_col], errors='coerce')
-        df.drop(columns=[found_col], inplace=True)
-    else:
-        print(f"Available columns: {df.columns}")
-        raise ValueError(f"DataFrame does not contain any of the columns {possible_col_names} for datetime")
-
-    df['datetime'] = df['datetime'].ffill().bfill().fillna(pd.Timestamp.now())
-    return df
+            df['datetime'] = pd.to_datetime(df[col_name], errors='coerce')
+            df.drop(columns=[col_name], inplace=True)
+            df['datetime'] = df['datetime'].ffill().bfill().fillna(pd.Timestamp.now())
+            return df
+    raise ValueError(f"DataFrame missing expected datetime columns {possible_col_names}")
 
 def clean_and_normalize(spy_data, vix_data, iv_data, gdp_data, cpi_data, sentiment_data, articles):
     """
     Clean and normalize data, ensuring:
-    1. Consistent 'datetime' column.
-    2. No missing or invalid values (NaN, NaT).
+    - Consistent 'datetime' column.
+    - No missing or invalid values (NaN, NaT).
     """
     spy_data_cleaned = {}
     for tf, df in spy_data.items():
-        print(f"\nCleaning SPY data for {tf} timeframe")
-        if tf == '1d':
-            df = ensure_datetime(df, ['Date', 'Datetime'])
-        else:
-            df = ensure_datetime(df, ['Datetime'])
+        print(f"\nCleaning SPY {tf} data")
+        df = ensure_datetime(df, ['Date', 'Datetime'] if tf == '1d' else ['Datetime'])
+        df = calculate_indicators(df)
+
+        # Check indicators for NaNs or all-zero values
+        for col in ['RSI', 'UpperBand', 'LowerBand', 'ATR', 'ADX', 'MACD_Histogram']:
+            if df[col].isna().any() or (df[col] == 0).all():
+                print(f"Warning: {col} in {tf} timeframe has NaNs or all-zero values.")
         
-        df = df.ffill().bfill()
-        spy_data_cleaned[tf] = df
+        spy_data_cleaned[tf] = df.ffill().bfill()
         print(f"SPY {tf} data cleaned. Shape: {df.shape}")
 
-    print("\nCleaning VIX data")
-    vix_data = ensure_datetime(vix_data, ['Date', 'Datetime'])
-    vix_data = vix_data.ffill()
-    print("VIX data cleaned. Shape:", vix_data.shape)
-
-    print("\nCleaning IV data")
-    iv_data = ensure_datetime(iv_data, ['expiry'])
-    iv_data = iv_data.ffill()
-    print("IV data cleaned. Shape:", iv_data.shape)
-
-    print("\nCleaning GDP and CPI data")
-    gdp_data = pd.DataFrame(gdp_data).reset_index()
-    gdp_data.columns = ['datetime', 'value']
-    cpi_data = pd.DataFrame(cpi_data).reset_index()
-    cpi_data.columns = ['datetime', 'value']
-    gdp_data = gdp_data.ffill().bfill()
-    cpi_data = cpi_data.ffill().bfill()
-    print("GDP data cleaned. Shape:", gdp_data.shape)
-    print("CPI data cleaned. Shape:", cpi_data.shape)
-
-    print("\nCleaning Sentiment data")
-    current_date = datetime.now().strftime('%Y-%m-%d')
-    sentiment_data_cleaned = pd.DataFrame({'datetime': [current_date], 'sentiment_value': [sentiment_data]})
-    print("Sentiment data cleaned. Shape:", sentiment_data_cleaned.shape)
-
-    print("\nCleaning Articles data")
-    articles_cleaned = pd.DataFrame(articles.get('articles', []))
-    
-    if 'publishedAt' in articles_cleaned.columns:
-        articles_cleaned['datetime'] = pd.to_datetime(articles_cleaned['publishedAt'], errors='coerce')
-        articles_cleaned['datetime'] = articles_cleaned['datetime'].ffill().bfill()
-    else:
-        articles_cleaned['datetime'] = current_date
-    print("Articles data cleaned. Shape:", articles_cleaned.shape)
+    # Clean and normalize other data sources
+    vix_data = ensure_datetime(vix_data, ['Date', 'Datetime']).drop(columns=['Volume', 'Dividends', 'Stock Splits'], errors='ignore').ffill()
+    iv_data = ensure_datetime(iv_data, ['expiry']).ffill()
+    gdp_data, cpi_data = gdp_data.ffill().bfill().reset_index(), cpi_data.ffill().bfill().reset_index()
+    gdp_data.columns, cpi_data.columns = ['datetime', 'value'], ['datetime', 'value']
+    sentiment_data_cleaned = pd.DataFrame({'datetime': [datetime.now().strftime('%Y-%m-%d')], 'sentiment_value': [sentiment_data]})
+    articles_cleaned = pd.DataFrame(articles.get('articles', [])).assign(datetime=lambda df: pd.to_datetime(df.get('publishedAt', pd.Timestamp.now()), errors='coerce').ffill().bfill())
 
     datasets = {
         'spy_data': spy_data_cleaned,
@@ -122,16 +81,37 @@ def clean_and_normalize(spy_data, vix_data, iv_data, gdp_data, cpi_data, sentime
         'sentiment_data': sentiment_data_cleaned,
         'articles': articles_cleaned
     }
-
+    
     print("\n--- Cleaned Data Summary ---")
     for key, data in datasets.items():
         if isinstance(data, dict):
             for sub_key, sub_data in data.items():
-                print(f"{key} ({sub_key}): {sub_data.shape}")
+                print(f"{key} ({sub_key}): Shape {sub_data.shape}")
+                print(sub_data.head(2), "\n")
         else:
-            print(f"{key}: {data.shape}")
+            print(f"{key}: Shape {data.shape}")
+            print(data.head(2), "\n")
     
     return datasets
+
+def augment_data(spy_df, noise_level=0.01):
+    """
+    Perform data augmentation on SPY data to simulate slight market variations.
+    """
+    print("Augmenting data with noise level:", noise_level)
+    spy_df['Close_augmented'] = spy_df['Close'] * (1 + np.random.normal(0, noise_level, len(spy_df)))
+    return spy_df
+
+def apply_augmentations(spy_data):
+    """
+    Apply augmentations to each SPY timeframe data and append results.
+    """
+    augmented_spy_data = {}
+    for tf, df in spy_data.items():
+        print(f"Applying augmentations to {tf} timeframe data")
+        df_augmented = augment_data(df)
+        augmented_spy_data[tf] = df_augmented
+    return augmented_spy_data
 
 def load_existing_data(filename='local_data/historical_data.pickle'):
     """
@@ -139,61 +119,59 @@ def load_existing_data(filename='local_data/historical_data.pickle'):
     """
     if os.path.exists(filename):
         with open(filename, 'rb') as f:
-            existing_data = pickle.load(f)
-        print(f"\nExisting data loaded from {filename}.")
-        return existing_data
-    else:
-        print(f"{filename} not found. No existing data to load.")
-        return None
+            data = pickle.load(f)
+        print(f"Existing data loaded from {filename}.")
+        return data
+    print(f"{filename} not found.")
+    return None
 
 def append_new_data(existing_data, new_data):
     """
-    Append only new data to the existing data, ensuring a continuous historical record.
+    Append new data to the existing data, ensuring a continuous historical record.
     """
-    for key, df_new in new_data.items():
-        if isinstance(df_new, dict):
-            for sub_key, sub_df_new in df_new.items():
-                if key in existing_data and sub_key in existing_data[key]:
-                    existing_data[key][sub_key] = pd.concat(
-                        [existing_data[key][sub_key], sub_df_new]
-                    ).drop_duplicates(subset='datetime').sort_values(by='datetime')
-                else:
-                    if key not in existing_data:
-                        existing_data[key] = {}
-                    existing_data[key][sub_key] = sub_df_new
+    for key, new_df in new_data.items():
+        if isinstance(new_df, dict):
+            for sub_key, sub_df in new_df.items():
+                existing_data.setdefault(key, {}).setdefault(sub_key, pd.DataFrame())
+                existing_data[key][sub_key] = pd.concat([existing_data[key][sub_key], sub_df]).drop_duplicates('datetime').sort_values('datetime')
         else:
-            if key in existing_data:
-                existing_data[key] = pd.concat(
-                    [existing_data[key], df_new]
-                ).drop_duplicates(subset='datetime').sort_values(by='datetime')
-            else:
-                existing_data[key] = df_new
+            existing_data.setdefault(key, pd.DataFrame())
+            existing_data[key] = pd.concat([existing_data[key], new_df]).drop_duplicates('datetime').sort_values('datetime')
     return existing_data
 
 def save_to_pickle(data, filename='local_data/historical_data.pickle'):
     """
-    Save the updated data to the pickle file.
+    Save data to the specified pickle file.
     """
     with open(filename, 'wb') as f:
         pickle.dump(data, f)
     print(f"\nData saved to {filename}.")
 
 if __name__ == "__main__":
-    # Step 1: Import the data
+    # Step 1: Import data
     spy_data, vix_data, iv_data, gdp_data, cpi_data, sentiment_data, articles = import_data()
 
-    # Step 2: Clean and normalize the data
+    # Step 2: Clean and normalize data
     cleaned_data = clean_and_normalize(spy_data, vix_data, iv_data, gdp_data, cpi_data, sentiment_data, articles)
 
-    # Step 3: Load existing data if available
+    # Step 3: Apply augmentations to SPY data
+    augmented_data = apply_augmentations(cleaned_data['spy_data'])
+    cleaned_data['spy_data'] = augmented_data  # Integrate augmented data
+
+    # Step 4: Load existing data if available
     existing_data = load_existing_data()
 
-    if existing_data:
-        # Step 4: Append the new data to the existing data
-        updated_data = append_new_data(existing_data, cleaned_data)
-    else:
-        # If no existing data, use the new data directly
-        updated_data = cleaned_data
+    # Step 5: Append new data
+    updated_data = append_new_data(existing_data, cleaned_data) if existing_data else cleaned_data
+    print("\n--- Updated Data Overview ---")
+    for key, data in updated_data.items():
+        if isinstance(data, dict):
+            for sub_key, sub_data in data.items():
+                print(f"{key} ({sub_key}): Shape {sub_data.shape}")
+                print(sub_data.head(2), "\n")
+        else:
+            print(f"{key}: Shape {data.shape}")
+            print(data.head(2), "\n")
 
-    # Step 5: Save the updated data to the pickle file
+    # Step 6: Save updated data to pickle
     save_to_pickle(updated_data)
