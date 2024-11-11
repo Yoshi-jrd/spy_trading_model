@@ -4,14 +4,13 @@ from keras.optimizers import Adam
 from scikeras.wrappers import KerasRegressor
 from sklearn.model_selection import GridSearchCV
 
-def build_lstm_model(input_shape, units=50, dropout=0.2, learning_rate=0.01):
+def build_lstm_model(input_shape, units=100, dropout=0.2, learning_rate=0.01):
     model = Sequential()
-    model.add(LSTM(units=units, return_sequences=True, input_shape=input_shape))
+    model.add(LSTM(units, input_shape=input_shape))
     model.add(Dropout(dropout))
-    model.add(LSTM(units=units))
     model.add(Dense(1))
     optimizer = Adam(learning_rate=learning_rate)
-    model.compile(optimizer=optimizer, loss='mean_squared_error')
+    model.compile(optimizer=optimizer, loss='mean_squared_error', metrics=['mae'])
     return model
 
 def hypertune_lstm(X_train, y_train, input_shape):

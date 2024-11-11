@@ -1,0 +1,74 @@
+{
+    "RandomForest": {
+        "72h": {
+            "mae": [
+                1.0
+            ],
+            "rmse": [
+                1.5
+            ],
+            "ci_low": [
+                570
+            ],
+            "ci_high": [
+                580
+            ],
+            "weights": null
+        }
+    },
+    "XGBoost": {
+        "72h": {
+            "mae": [
+                1.0
+            ],
+            "rmse": [
+                1.5
+            ],
+            "ci_low": [
+                570
+            ],
+            "ci_high": [
+                580
+            ],
+            "weights": null
+        }
+    },
+    "GradientBoosting": {
+        "72h": {
+            "mae": [
+                1.0
+            ],
+            "rmse": [
+                1.5
+            ],
+            "ci_low": [
+                570
+            ],
+            "ci_high": [
+                580
+            ],
+            "weights": null
+        }
+    },
+    "Stacked Model": {
+        "72h": {
+            "mae": [
+                1.0
+            ],
+            "rmse": [
+                1.5
+            ],
+            "ci_low": [
+                570
+            ],
+            "ci_high": [
+                580
+            ],
+            "weights": [
+                0.5,
+                0.3,
+                0.2
+            ]
+        }
+    }
+}

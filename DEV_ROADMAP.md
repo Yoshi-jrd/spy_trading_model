@@ -14,25 +14,31 @@
 
 ## Current State and Immediate Next Steps
 
-### 1. **Indicator Integration and Validation**
+### Immediate Next Steps: Core Prediction Validation
 
-- **Status**: Complete; initial tests indicate improved accuracy for medium-to-long-term predictions.
-- **Next Steps**: Validate model stability and accuracy with finalized indicators through comprehensive backtesting.
+#### 1. **Model Prediction Accuracy Validation**
 
-### 2. **LSTM Hypertuning**
+- **Objective**: Validate model’s ability to predict SPY price within a 12-96 hour window.
+- **Key Metrics**:
+  - **MAE (Mean Absolute Error)** and **RMSE (Root Mean Squared Error)** to evaluate prediction accuracy.
+  - **Confidence Interval**: Confirm that the model’s predicted range (e.g., 75% confidence interval) accurately encompasses actual SPY prices within this timeframe.
+- **Modules to Evaluate/Run**:
+  - **`train_models.py`**: Run with best parameters post-hypertuning to generate predictions for test data.
+  - **`evaluate_model.py`**: Assess model accuracy and error metrics on 12-96 hour predictions.
+- **Visualization**:
+  - Use `plot_spy_data.py` to visualize actual vs. predicted prices, including confidence intervals, to inspect prediction quality.
 
-- **Status**: In progress, optimized for performance to finalize ideal parameters for 1-hour and 1-day timeframes.
-- **Next Steps**: Complete hypertuning (expected within 2–3 days), then incorporate optimal parameters into `train_models.py`.
+#### 2. **Set Tolerance Thresholds for Accuracy**
 
-### 3. **Comprehensive Backtesting and Stacking Evaluation**
+- **Define acceptable error ranges** (e.g., within ±2% of the actual price) for live trading viability.
+- **Iterate** if needed, adjusting model parameters or feature engineering based on results.
 
-- **Objective**: Test model predictions with full backtests, evaluate accuracy, and experiment with stacked models.
-- **Timeline**: Begin after hypertuning; expected duration 3–5 days for initial results.
+#### 3. **Comprehensive Backtesting Preparation**
 
-### 4. **Real-Time Execution Preparation**
-
-- **Objective**: Prepare a live trading module to initiate real trades based on model outputs, focusing initially on credit spreads and straddles.
-- **Timeline**: 1-2 weeks post-backtesting for real-time testing readiness.
+- **Focus**: Proceed with trade simulation logic only if the model’s predictions meet the defined tolerable error range for the 12-96 hour window.
+- **Modules to Prepare**:
+  - **`backtest_strategy.py`**: Finalize for strategy testing based on validated predictions.
+  - **`simulate_trade.py`**: To be developed for testing trade executions based on refined predictions.
 
 ---
 
@@ -40,7 +46,6 @@
 
 | Milestone                               | Expected Completion        |
 | --------------------------------------- | -------------------------- |
-| **Finalize Indicator Integration**      | Complete                   |
 | **Complete LSTM Hypertuning**           | 2–3 days                   |
 | **Backtesting and Stacking Evaluation** | 3–5 days                   |
 | **Real-Time Testing Preparation**       | 1–2 weeks post-backtesting |
@@ -60,7 +65,6 @@
 
 - **Modules and Key Files**:
   - **`train_models.py`**: Trains models (RandomForest, XGBoost, GradientBoosting, LSTM) across multiple timeframes (`5m`, `15m`, `1h`, `1d`).
-  - **Models and Functions**: RandomForest, XGBoost, GradientBoosting for short-term, LSTM for 1-hour and daily predictions.
   - **Testing Outputs**: Logs MAE and RMSE metrics, confirming prediction accuracy.
 
 ### Phase 3: Hypertuning and Model Optimization (In Progress)
@@ -109,9 +113,6 @@ SPY_TRADING_MODEL/
 ├── sentiment_history.csv
 ├── model_evaluation_results.csv
 ├── best_params.pkl
-├── best_params_rf.pkl
-├── best_params_gb.pkl
-├── best_params_xgb.pkl
 ├── cleaned_data.pickle
 │
 ├── local_data/
@@ -157,80 +158,15 @@ SPY_TRADING_MODEL/
 │
 └── venv/ # Virtual environment for project dependencies.
 
-## Summary of Current Goals
+## Summary of Next Steps
 
-    Finalize Hypertuning: Complete LSTM hypertuning for enhanced 1h and 1d predictions.
-    Initiate Comprehensive Backtesting: Assess performance on historical data with new configurations.
-    Prepare for Real-Time Execution: Set up real-time environment for live trading based on model outputs.
-    Enhance Predictive Capabilities: Continue to monitor and refine the impact of indicators and external data for longer-term robustness.
-
----
-
-## Immediate Next Steps: Core Prediction Validation
-
-### 1. **Model Prediction Accuracy Validation**
-
-- **Objective**: Assess the model’s ability to predict SPY price within a 12-96 hour window.
-- **Key Metrics**:
-  - **MAE (Mean Absolute Error)** and **RMSE (Root Mean Squared Error)** to evaluate prediction accuracy.
-  - **Confidence Interval**: Confirm that the model’s predicted range (e.g., 75% confidence interval) accurately encompasses actual SPY prices within this timeframe.
-- **Modules to Evaluate/Run**:
-  - **`train_models.py`** (Post-hypertuning): Run with best parameters to generate predictions for test data.
-  - **`evaluate_model.py`**: Validate accuracy and review error metrics on 12-96 hour predictions.
-- **Visualization**:
-  - Use `plot_spy_data.py` to visualize actual vs. predicted prices, including confidence intervals, to visually inspect prediction quality.
-
-## Implementation Focus
-
-      For the first backtest, the focus will be on validating that the model can reliably predict price movements in the specified timeframe (12-96 hours) and generate accurate buy/sell signals. By starting with basic validation and signal testing, we can confirm that the model is sufficiently accurate for more complex trading strategies, ultimately building toward a robust, automated trade execution system.
-
-      Once this initial backtest module proves successful, we can progressively add more sophisticated logic, such as dynamic trade management, rolling, stop-loss adjustments, and enhanced entry/exit conditions based on confidence intervals or economic indicators.
-
-### 2. **Set Tolerance Thresholds for Accuracy**
-
-- **Define acceptable error ranges** (e.g., within ±2% of the actual price) for the predictions to be considered viable for live trading.
-- **Iterate** if needed, adjusting model parameters or feature engineering based on results.
-
-### 3. **Comprehensive Backtesting Preparation**
-
-- **Focus**: Only proceed with trade simulation logic if the model’s predictions fall within the defined tolerable error range for the 12-96 hour window.
-- **Modules to Prepare**:
-  - **`backtest_strategy.py`**: Only finalize this module once prediction accuracy is validated. The strategy can then focus on entry and exit logic, based on validated predictions.
-  - **`simulate_trade.py`**: To be developed later; use it to test trade executions based on refined predictions.
-
----
-
-### Summary
-
-Our priority is to validate and ensure prediction accuracy within the target range (12-96 hours) before implementing trade logic. By establishing a baseline accuracy, we increase the reliability of any future trade simulations and live trading strategies. This approach prevents the risk of implementing complex trading logic on a model that may not yet be accurate enough for real-world application.
-
----
-
-This validation-first strategy will help us create a solid foundation for the predictive aspect of our SPY options trading model, paving the way for reliable backtesting and trade simulations.
-
----
-
-### 4. **Backtesting and Strategy Validation**
-
-- **Evaluate/Update**:
-  - `backtest_strategy.py`: Confirm logic for simulating trades based on model predictions (credit spreads, condors, straddles).
-  - `evaluate_model.py`: Ensure metrics like MAE and RMSE are accurate and useful for options trading evaluation.
-- **Develop**:
-  - `simulate_trade.py`: Create this script to simulate trade executions based on model predictions.
-
----
-
-### 5. **Real-Time Execution Preparation**
-
-- **Evaluate/Update**:
-  - `generate_trade_signals.py`: Confirm that trade signals are generated based on model outputs, aligning with backtested strategies.
-- **Develop**:
-  - `live_trade_executor.py`: Begin drafting logic for live trade execution, including risk management and automated stop-loss features.
-
-### 6. **Workflow and Evaluation Coordination**
-
-- **Evaluate/Update**:
-  - `run_evaluation_workflow.py`: Ensure it coordinates all evaluation steps (model predictions, backtesting, trade simulations) in a single workflow for streamlined testing.
+- **Finalize Hypertuning**: Complete LSTM hypertuning and integrate the best-performing parameters for improved prediction accuracy.
+- **Comprehensive Backtesting**: Execute backtesting on historical data with new configurations, focusing on performance across different market conditions.
+- **Prepare Real-Time Execution**: Set up a live environment for real-time trading based on model outputs, implementing triggers for credit spreads, straddles, and other strategies.
+- **Enhance Model Predictive Capabilities**: Continue to refine the impact of additional indicators, new data inputs, and external events on model robustness for future performance stability.
+- **Validate Trade Simulations**: Use `simulate_trade.py` to run simulations based on model predictions, validating trade strategies such as credit spreads, condors, and straddles.
+- **Implement Real-Time Monitoring and Reporting**: Begin working on real-time monitoring tools to track the model’s performance, displaying live predictions, confidence intervals, and actual SPY price movements.
+- **Set Up Automated Execution Triggers**: Configure `live_trade_executor.py` (when developed) to execute trades based on model signals, with built-in stop-loss and profit-taking mechanisms.
 
 ---
 
@@ -257,5 +193,45 @@ This validation-first strategy will help us create a solid foundation for the pr
 - **`backtest_strategy.py`** runs historical tests to validate model decisions.
 - Future considerations include incorporating reinforcement learning in **`rl_model.py`** and refining visualizations in **`plot_spy_data.py`**.
 
+---
+
 This roadmap and directory structure outline a structured development plan for achieving a predictive SPY trading model with efficient data handling, backtesting, real-time monitoring, and potential for future enhancements.
 ```
+
+Summary of Actionable Next Steps:
+
+    Integrate stacking into this mini-script with weight optimization.
+    Test with longer forward prediction windows (e.g., 24-hour, 36-hour).
+    Conduct hyperparameter tuning and feature selection for RandomForest.
+    Add confidence intervals around predictions.
+    Validate with LSTM to observe if sequential modeling improves results.
+
+Proposed Enhancements
+
+To build on the working code, I recommend three main actions:
+
+    Add Longer Prediction Horizons Over a 30-Day Period:
+        Create a rolling prediction framework to simulate forward-looking predictions as if we’re forecasting daily for a month.
+        This will use intervals of 24h, 48h, 72h, 96h, and 168h, providing insights into how the model performs in an extended simulation.
+
+    Incorporate More Model Layers for Stacking:
+        Consider adding additional layers, such as LSTM or ensemble techniques like AdaBoost, especially for capturing longer-term dependencies (e.g., 96h, 168h).
+        Ensure compatibility with stacking by defining how these layers interact with the current ensemble and optimize weight allocations.
+
+    Analyze and Fine-Tune Model Hyperparameters:
+        Conduct hyperparameter tuning for individual models (particularly the RandomForest and GradientBoosting models, as they often contribute heavily).
+        Set up a grid search or use an optimizer to find the best parameters based on each timeframe and horizon, aiming to reduce MAE and RMSE further.
+
+Implementation Plan
+
+    Set Up Rolling Predictions:
+        Modify the mini_train_models function to create rolling predictions over 30 days.
+        Use a loop to simulate daily predictions for each target horizon and track cumulative results.
+
+    Integrate New Models:
+        Add LSTM and other layers (if feasible with your current hardware setup) to the model stacking function.
+        Test how these new models contribute to different timeframes, and use optimize_weights to determine their optimal inclusion.
+
+    Hyperparameter Tuning:
+        Implement a tuning process, either within the existing script or as a standalone function, to test different settings for n_estimators, max_depth, and learning_rate.
+        Focus tuning efforts on the most impactful models and horizons (e.g., 5m-24h and 1h-12h).
