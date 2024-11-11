@@ -235,3 +235,16 @@ Implementation Plan
     Hyperparameter Tuning:
         Implement a tuning process, either within the existing script or as a standalone function, to test different settings for n_estimators, max_depth, and learning_rate.
         Focus tuning efforts on the most impactful models and horizons (e.g., 5m-24h and 1h-12h).
+
+Implementation Plan
+
+    Implement Interval-Specific Models with a Meta-Model:
+        Train individual models for each timeframe (24h, 48h, 72h, etc.) and stack their predictions through a lightweight meta-model to determine optimal weights.
+
+    Incorporate LSTM/GRU for Longer Horizons:
+        Add LSTM to the model ensemble, specifically targeting the 48h+ predictions where sequential dependency is most critical.
+
+    Enhance Feature Engineering:
+        Add lagged features, seasonal patterns, and introduce new indicators.
+
+Starting with this approach should yield noticeable improvements, particularly in reducing errors for 48h, 72h, and 96h horizons, which are typically more challenging. Let me know if you'd like detailed guidance on implementing each step or to start with a specific one.

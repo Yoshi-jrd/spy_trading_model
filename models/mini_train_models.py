@@ -14,7 +14,7 @@ from dynamic_weight_optimizer import optimize_weights
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-# Load and preprocess data with interpolation and synthetic adjustments
+# Load and preprocess data with interpolation, synthetic adjustments, and feature engineering
 def load_and_preprocess_data():
     # Load 1-hour and 1-day SPY data
     with open("local_data/historical_data.pickle", 'rb') as f:
@@ -33,8 +33,28 @@ def load_and_preprocess_data():
     spy_data_combined = spy_data_combined.dropna().reset_index(drop=True)
     spy_data_combined = add_synthetic_variations(spy_data_combined)
     
+    # Mapping Impulse_Color to numerical values
     spy_data_combined['Impulse_Color'] = spy_data_combined['Impulse_Color'].map({'red': -1, 'green': 1, 'gray': 0})
-    logger.info(f"Extended data with {len(spy_data_combined)} rows.")
+
+    # Feature engineering: Add lagged features and moving averages
+    for lag in [1, 2, 3]:
+        spy_data_combined[f'Close_lag_{lag}'] = spy_data_combined['Close'].shift(lag)
+        spy_data_combined[f'RSI_lag_{lag}'] = spy_data_combined['RSI'].shift(lag)
+        spy_data_combined[f'MACD_Histogram_lag_{lag}'] = spy_data_combined['MACD_Histogram'].shift(lag)
+    
+    for window in [5, 10, 15]:
+        spy_data_combined[f'Close_ma_{window}'] = spy_data_combined['Close'].rolling(window).mean()
+        spy_data_combined[f'RSI_ma_{window}'] = spy_data_combined['RSI'].rolling(window).mean()
+        spy_data_combined[f'MACD_Histogram_ma_{window}'] = spy_data_combined['MACD_Histogram'].rolling(window).mean()
+
+    # Feature engineering: Add seasonal patterns
+    spy_data_combined['day_of_week'] = pd.to_datetime(spy_data_combined['datetime']).dt.dayofweek
+    spy_data_combined['hour_of_day'] = pd.to_datetime(spy_data_combined['datetime']).dt.hour
+    
+    # Dropping any rows with NaN values after feature engineering
+    spy_data_combined = spy_data_combined.dropna().reset_index(drop=True)
+    
+    logger.info(f"Extended data with {len(spy_data_combined)} rows, including engineered features.")
     
     return spy_data_combined
 
@@ -61,20 +81,25 @@ def evaluate_model(y_true, y_pred):
     avg_diff = np.mean(np.abs(y_pred - y_true))
     return mae, rmse, avg_diff
 
-# Train and stack models
-def train_and_stack_models(X_train, y_train, X_val, y_val):
+from sklearn.linear_model import Ridge
+
+# Train and stack models with meta-model for interval-specific predictions
+def train_and_stack_models(X_train, y_train, X_val, y_val, interval_name):
+    # Define base models
     rf_model = RandomForestRegressor(n_estimators=200, max_depth=12)
     gb_model = GradientBoostingRegressor(n_estimators=200, max_depth=4)
     xgb_model = XGBRegressor(n_estimators=200, max_depth=4, learning_rate=0.1)
     et_model = ExtraTreesRegressor(n_estimators=150, max_depth=10)
     cb_model = CatBoostRegressor(iterations=150, depth=6, learning_rate=0.1, verbose=0)
 
+    # Train base models
     rf_model.fit(X_train, y_train)
     gb_model.fit(X_train, y_train)
     xgb_model.fit(X_train, y_train)
     et_model.fit(X_train, y_train)
     cb_model.fit(X_train, y_train)
 
+    # Get predictions from each base model
     predictions_matrix = np.column_stack([
         rf_model.predict(X_val),
         gb_model.predict(X_val),
@@ -82,10 +107,15 @@ def train_and_stack_models(X_train, y_train, X_val, y_val):
         et_model.predict(X_val),
         cb_model.predict(X_val)
     ])
-    best_weights = optimize_weights(predictions_matrix, y_val)
-    stacked_predictions = np.dot(predictions_matrix, best_weights)
     
-    return stacked_predictions, best_weights
+    # Meta-model to find optimal weights
+    ridge_meta_model = Ridge(alpha=1.0)
+    ridge_meta_model.fit(predictions_matrix, y_val)
+    stacked_predictions = ridge_meta_model.predict(predictions_matrix)
+    
+    # Log and return the results
+    logger.info(f"Optimal weights for {interval_name}: {ridge_meta_model.coef_}")
+    return stacked_predictions, ridge_meta_model.coef_
 
 # Main function with rolling predictions over 30 days
 def mini_train_models():
@@ -125,7 +155,6 @@ def mini_train_models():
                 logger.info(f"End of data reached at {day}-day for interval {interval_name}.")
                 break
 
-            # Extract X_val and y_val with alignment check
             y_val = spy_data['Close'].shift(-shift_steps).iloc[start_idx:start_idx + shift_steps].dropna()
             X_val = spy_data[['MACD_Histogram', 'RSI', 'UpperBand', 'LowerBand', 'ATR', 'ADX', 'EMA9', 'EMA21', 'Impulse_Color']].iloc[start_idx:start_idx + shift_steps]
             
@@ -137,17 +166,18 @@ def mini_train_models():
                 logger.warning(f"Insufficient validation data for interval {interval_name} on day {day}. Skipping.")
                 continue
             
-            stacked_predictions, _ = train_and_stack_models(X, y, X_val, y_val)
+            # Train models and apply meta-model stacking
+            stacked_predictions, _ = train_and_stack_models(X, y, X_val, y_val, interval_name)
 
+            # Store predictions and actuals
             predictions_by_interval[interval_name].extend(stacked_predictions)
             if interval_name == '24h':
                 real_prices.extend(y_val)
 
-    # Evaluation and plotting
+    # Evaluation
     for interval_name, predictions in predictions_by_interval.items():
-        # Convert lists to NumPy arrays and align lengths
-        real_prices_np = np.array(real_prices[:len(predictions)])  # Truncate real_prices if needed
-        predictions_np = np.array(predictions[:len(real_prices_np)])  # Ensure predictions match real_prices length
+        real_prices_np = np.array(real_prices[:len(predictions)])  # Align real prices length
+        predictions_np = np.array(predictions[:len(real_prices_np)]) 
         
         mae, rmse, avg_diff = evaluate_model(real_prices_np, predictions_np)
         results_summary[interval_name] = {
@@ -156,17 +186,6 @@ def mini_train_models():
             'Avg Difference': avg_diff
         }
         logger.info(f"{interval_name} - MAE: {mae}, RMSE: {rmse}, Avg Difference: {avg_diff}")
-
-    # Plotting results for the 24-hour interval
-    plt.figure(figsize=(14, 8))
-    plt.plot(real_prices_np, label="Actual Price", color="blue", linewidth=1)
-    plt.plot(predictions_np, label="Predicted Price (24h Horizon)", color="orange", linestyle='--', linewidth=1)
-    plt.title("SPY Actual vs Predicted Prices - 24h Horizon Over 30 Days")
-    plt.xlabel("5-Minute Intervals Over 30 Days")
-    plt.ylabel("SPY Price")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
 
     return results_summary
 
