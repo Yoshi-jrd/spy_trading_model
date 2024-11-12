@@ -1,0 +1,54 @@
+{
+    "paths": {
+        "best_params": "best_model_params.json",
+        "historical_data": "local_data/historical_data.pickle"
+    },
+    "lstm": {
+        "sequence_length": 48,
+        "epochs": 10,
+        "batch_size": 32,
+        "units": 64,
+        "optimizer": "adam",
+        "loss": "mse"
+    },
+    "intervals": {
+        "24h": 96,
+        "48h": 192,
+        "72h": 288,
+        "96h": 384,
+        "168h": 672
+    },
+    "model_params": {
+        "RandomForestRegressor": {
+            "n_estimators": 200,
+            "max_depth": 12
+        },
+        "GradientBoostingRegressor": {
+            "n_estimators": 200,
+            "max_depth": 4
+        },
+        "XGBRegressor": {
+            "n_estimators": 200,
+            "max_depth": 4,
+            "learning_rate": 0.1
+        },
+        "ExtraTreesRegressor": {
+            "n_estimators": 150,
+            "max_depth": 10
+        },
+        "CatBoostRegressor": {
+            "iterations": 150,
+            "depth": 6,
+            "learning_rate": 0.1
+        },
+        "Ridge": {
+            "alpha": 1.0
+        }
+    },
+    "training": {
+        "start_day": 0,
+        "end_day": 30,
+        "daily_step": 96,
+        "early_stopping_threshold": 0.1
+    }
+}
