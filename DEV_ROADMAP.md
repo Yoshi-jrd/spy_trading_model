@@ -195,56 +195,80 @@ SPY_TRADING_MODEL/
 
 ---
 
-This roadmap and directory structure outline a structured development plan for achieving a predictive SPY trading model with efficient data handling, backtesting, real-time monitoring, and potential for future enhancements.
+# SPY Trading Model Development Roadmap
+
+## Current State
+
+- **Model Overview:** The model currently uses a combination of LSTM, RandomForest, XGBoost, and Gradient Boosting models stacked together with a Ridge meta-model for predicting SPY price movements. This setup shows moderate success in predicting short-term intervals (24h and 48h) but struggles with accuracy over longer intervals (72h and 96h).
+- **Performance Summary:**
+  - **24h Interval:** MAE: ~4.12, RMSE: ~5.33
+  - **48h Interval:** MAE: ~3.20, RMSE: ~4.62
+  - **72h Interval:** MAE: ~6.77, RMSE: ~7.57
+  - **96h Interval:** MAE: ~10.29, RMSE: ~10.85
+- **Model Challenges:**
+  - Inconsistent accuracy for longer prediction intervals (72h and 96h).
+  - Limited feature engineering and lack of dynamic weighting/regularization in the stacked model.
+  - Limited dataset and synthetic data for robust training.
+
+## Immediate Next Steps
+
+1. **Feature Engineering Enhancements:**
+
+   - Add advanced technical indicators such as ADX, VWAP, and Chaikin Oscillator.
+   - Create rolling window features (averages, volatility measures) for 1-hour and 1-day intervals.
+
+2. **Dynamic Weight Optimization:**
+
+   - Implement dynamic weight adjustments in the Ridge meta-model for different prediction intervals.
+   - Add regularization techniques (L1, L2 penalties) to improve the generalization of the model.
+
+3. **Hyperparameter Tuning:**
+
+   - Run a thorough grid/randomized search on key hyperparameters for the LSTM, RandomForest, XGBoost, and Gradient Boosting models.
+   - Adjust epochs dynamically based on the prediction interval to prevent overfitting on short-term data.
+
+4. **Hybrid Model Approach:**
+   - Explore a hybrid approach by integrating ARIMA or GARCH models to better capture trends for longer-term (72h, 96h) predictions.
+
+## Short-Term Goals (0-3 Months)
+
+1. **Model Refinement:**
+
+   - Test and validate new technical indicators and rolling window features to evaluate their impact on accuracy.
+   - Complete implementation of dynamic weight adjustments and test the impact on 24h and 48h predictions.
+   - Incorporate ARIMA or GARCH models for 72h and 96h intervals, analyzing potential improvements in accuracy.
+
+2. **Data Augmentation and Expansion:**
+
+   - Expand the historical dataset and explore synthetic data generation to increase data diversity for training.
+   - Refine the `data_loader` to handle large datasets and new indicators effectively.
+
+3. **Backtesting and Validation:**
+   - Develop a robust backtesting module to evaluate model predictions on a rolling basis across all intervals.
+   - Test the updated model on a sample of real-world historical SPY data to validate short- and medium-term accuracy.
+
+## Long-Term Goals (3-12 Months)
+
+1. **Enhanced Model Execution and Deployment:**
+
+   - Finalize an efficient and robust model pipeline with minimal latency for real-time predictions.
+   - Prepare for deployment on a production-grade system, leveraging GPU/parallel processing to maximize performance.
+
+2. **Refinement of Execution Strategy:**
+
+   - Integrate additional real-time data sources (news sentiment, earnings, etc.) and explore their impact on predictions.
+   - Develop an ensemble confidence weighting system that adapts based on market volatility and historical accuracy per timeframe.
+
+3. **Continuous Model Testing and Adaptation:**
+
+   - Implement an automated framework for continuous model retraining and backtesting using new data.
+   - Establish periodic model evaluation benchmarks and review model accuracy monthly to fine-tune weights, parameters, and features as needed.
+
+4. **Advanced Strategy Development:**
+   - Develop and refine a strategy for executing live trades based on model predictions, including risk management and portfolio allocation tactics.
+   - Monitor model performance in live trading scenarios and iterate based on real-world outcomes to refine prediction confidence intervals and accuracy.
+
+---
+
+This roadmap will help ensure that the SPY trading model evolves effectively, meeting both short-term objectives for improved accuracy and long-term goals for robust, real-time trading applications.
 ```
-
-Summary of Actionable Next Steps:
-
-    Integrate stacking into this mini-script with weight optimization.
-    Test with longer forward prediction windows (e.g., 24-hour, 36-hour).
-    Conduct hyperparameter tuning and feature selection for RandomForest.
-    Add confidence intervals around predictions.
-    Validate with LSTM to observe if sequential modeling improves results.
-
-Proposed Enhancements
-
-To build on the working code, I recommend three main actions:
-
-    Add Longer Prediction Horizons Over a 30-Day Period:
-        Create a rolling prediction framework to simulate forward-looking predictions as if we’re forecasting daily for a month.
-        This will use intervals of 24h, 48h, 72h, 96h, and 168h, providing insights into how the model performs in an extended simulation.
-
-    Incorporate More Model Layers for Stacking:
-        Consider adding additional layers, such as LSTM or ensemble techniques like AdaBoost, especially for capturing longer-term dependencies (e.g., 96h, 168h).
-        Ensure compatibility with stacking by defining how these layers interact with the current ensemble and optimize weight allocations.
-
-    Analyze and Fine-Tune Model Hyperparameters:
-        Conduct hyperparameter tuning for individual models (particularly the RandomForest and GradientBoosting models, as they often contribute heavily).
-        Set up a grid search or use an optimizer to find the best parameters based on each timeframe and horizon, aiming to reduce MAE and RMSE further.
-
-Implementation Plan
-
-    Set Up Rolling Predictions:
-        Modify the mini_train_models function to create rolling predictions over 30 days.
-        Use a loop to simulate daily predictions for each target horizon and track cumulative results.
-
-    Integrate New Models:
-        Add LSTM and other layers (if feasible with your current hardware setup) to the model stacking function.
-        Test how these new models contribute to different timeframes, and use optimize_weights to determine their optimal inclusion.
-
-    Hyperparameter Tuning:
-        Implement a tuning process, either within the existing script or as a standalone function, to test different settings for n_estimators, max_depth, and learning_rate.
-        Focus tuning efforts on the most impactful models and horizons (e.g., 5m-24h and 1h-12h).
-
-Implementation Plan
-
-    Implement Interval-Specific Models with a Meta-Model:
-        Train individual models for each timeframe (24h, 48h, 72h, etc.) and stack their predictions through a lightweight meta-model to determine optimal weights.
-
-    Incorporate LSTM/GRU for Longer Horizons:
-        Add LSTM to the model ensemble, specifically targeting the 48h+ predictions where sequential dependency is most critical.
-
-    Enhance Feature Engineering:
-        Add lagged features, seasonal patterns, and introduce new indicators.
-
-Starting with this approach should yield noticeable improvements, particularly in reducing errors for 48h, 72h, and 96h horizons, which are typically more challenging. Let me know if you'd like detailed guidance on implementing each step or to start with a specific one.

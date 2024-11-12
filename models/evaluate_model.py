@@ -10,19 +10,21 @@ logger = logging.getLogger(__name__)
 
 def evaluate_model(y_true, y_pred):
     """
-    Evaluate model performance using Mean Absolute Error (MAE) and Root Mean Squared Error (RMSE).
+    Evaluate model performance using MAE, RMSE, and Average Difference.
     
     Args:
-        y_true (np.array or pd.Series): Actual values
-        y_pred (np.array or pd.Series): Predicted values
+        y_true (np.array or pd.Series): Actual values.
+        y_pred (np.array or pd.Series): Predicted values.
         
     Returns:
-        tuple: MAE and RMSE values
+        tuple: MAE, RMSE, and Average Difference values.
     """
     mae = mean_absolute_error(y_true, y_pred)
     rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-    logger.info(f"Evaluation Metrics - MAE: {mae}, RMSE: {rmse}")
-    return mae, rmse
+    avg_diff = np.mean(np.abs(y_true - y_pred))
+    
+    logger.info(f"Evaluation Metrics - MAE: {mae}, RMSE: {rmse}, Average Difference: {avg_diff}")
+    return mae, rmse, avg_diff
 
 def compute_confidence_interval(predictions, confidence_level=0.75):
     """
@@ -42,37 +44,38 @@ def compute_confidence_interval(predictions, confidence_level=0.75):
     lower_bound = mean_pred - margin_of_error
     upper_bound = mean_pred + margin_of_error
     
-    logger.info(f"Confidence Interval ({confidence_level*100}%): ({lower_bound}, {upper_bound})")
+    logger.info(f"Confidence Interval ({confidence_level * 100}%): ({lower_bound}, {upper_bound})")
     return lower_bound, upper_bound
 
 def evaluate_multiple_timeframes(predictions_summary):
     """
     Evaluate model predictions across multiple timeframes and output summarized results.
-
+    
     Args:
         predictions_summary (list): A list containing tuples with (predictions, actual values, model_name, timeframe).
         
     Returns:
-        dict: A summary of MAE, RMSE, and confidence intervals for each model and timeframe.
+        dict: A summary of MAE, RMSE, Average Difference, and confidence intervals for each model and timeframe.
     """
     summary = {}
     for predictions, y_true, model_name, timeframe in predictions_summary:
-        mae, rmse = evaluate_model(y_true, predictions)
+        mae, rmse, avg_diff = evaluate_model(y_true, predictions)
         lower, upper = compute_confidence_interval(predictions)
         
         summary_key = f"{model_name}_{timeframe}h"
         summary[summary_key] = {
             "MAE": mae,
             "RMSE": rmse,
+            "Average Difference": avg_diff,
             "Confidence Interval": (lower, upper)
         }
         
-        logger.info(f"{summary_key} - MAE: {mae}, RMSE: {rmse}, Confidence Interval: ({lower}, {upper})")
+        logger.info(f"{summary_key} - MAE: {mae}, RMSE: {rmse}, Average Difference: {avg_diff}, Confidence Interval: ({lower}, {upper})")
     
     return summary
 
+# For testing or as a standalone script
 if __name__ == "__main__":
-    # Example usage
     import numpy as np
 
     # Simulate actual values and predictions
@@ -80,11 +83,11 @@ if __name__ == "__main__":
     y_pred = np.array([101, 101, 97, 100, 100, 102, 106])
 
     # Evaluate single set of predictions
-    mae, rmse = evaluate_model(y_true, y_pred)
+    mae, rmse, avg_diff = evaluate_model(y_true, y_pred)
     lower, upper = compute_confidence_interval(y_pred)
     
     # Output example for logging
-    logger.info(f"Single Evaluation - MAE: {mae}, RMSE: {rmse}, CI: ({lower}, {upper})")
+    logger.info(f"Single Evaluation - MAE: {mae}, RMSE: {rmse}, Average Difference: {avg_diff}, CI: ({lower}, {upper})")
     
     # Example for multiple timeframes
     predictions_summary = [
