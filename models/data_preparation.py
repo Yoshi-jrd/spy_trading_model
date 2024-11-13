@@ -10,7 +10,6 @@ config_path = os.path.join(os.path.dirname(__file__), 'config.json')
 with open(config_path, 'r') as f:
     config = json.load(f)
 
-
 def load_data():
     """Load and preprocess data from pickle file."""
     with open(config['paths']['historical_data'], 'rb') as f:
@@ -34,17 +33,40 @@ def preprocess_data(spy_data_15m):
     spy_data_15m = spy_data_15m.dropna().reset_index(drop=True)
     return spy_data_15m
 
-def prepare_lstm_data(df):
-    """Prepare sequences and targets for LSTM."""
-    sequence_length = config['lstm']['sequence_length']
+def prepare_lstm_data(df, sequence_length=48, interval_steps=26):
+    """
+    Prepare sequences and targets for LSTM with market-hour adjusted interval steps.
+    
+    Parameters:
+    - df: DataFrame containing the feature data.
+    - sequence_length: Length of each LSTM input sequence.
+    - interval_steps: Number of market-hour-adjusted steps forward for the prediction target.
+
+    Returns:
+    - sequences: Array of sequences for LSTM training.
+    - targets: Array of target values aligned with each sequence.
+    - close_scaler: Scaler fitted on 'Close' values for inverse transformation.
+    """
     scaler = MinMaxScaler()
     close_scaler = MinMaxScaler()
+    
+    # Scale features and close values
     scaled_data = scaler.fit_transform(df[['Close_15m', 'MACD_Histogram_15m', 'RSI_15m', 'UpperBand_15m', 'LowerBand_15m']])
     scaled_close = close_scaler.fit_transform(df[['Close_15m']])
     
     sequences, targets = [], []
-    for i in range(len(scaled_data) - sequence_length):
-        sequences.append(scaled_data[i:i + sequence_length])
-        targets.append(scaled_close[i + sequence_length, 0])
     
-    return np.array(sequences), np.array(targets).reshape(-1, 1), close_scaler
+    # Iterate only to the point where we can safely predict interval_steps ahead
+    for i in range(len(scaled_data) - sequence_length - interval_steps + 1):
+        # Collect the sequence
+        sequences.append(scaled_data[i:i + sequence_length])
+        
+        # Calculate the target value with the interval steps forward
+        target_index = i + sequence_length + interval_steps - 1
+        targets.append(scaled_close[target_index, 0])
+
+    # Convert to numpy arrays for consistency
+    sequences = np.array(sequences)
+    targets = np.array(targets).reshape(-1, 1)
+    
+    return sequences, targets, close_scaler
