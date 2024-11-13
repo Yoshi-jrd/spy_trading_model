@@ -7,6 +7,7 @@ from model_definitions import build_lstm, build_random_forest, build_gradient_bo
 from evaluate_model import evaluate_model
 from dynamic_weight_optimizer import optimize_weights
 import matplotlib.pyplot as plt
+from data_processing.data_augmentation import create_year_of_15min_data  # New import
 
 # Set the path to config.json based on the current file's location
 config_path = os.path.join(os.path.dirname(__file__), 'config.json')
@@ -48,7 +49,6 @@ def train_and_stack_models(spy_data, interval_name, interval_steps):
     lstm_predictions = close_scaler.inverse_transform(lstm_model.predict(X_train_seq)).flatten()
 
     # Convert sequence data to a suitable format for other models
-    # Use only the last timestep for each sequence as input for the non-LSTM models
     X_train_2d = X_train_seq[:, -1, :]  # Extract last timestep
 
     # Train other models
@@ -82,7 +82,7 @@ def train_and_stack_models(spy_data, interval_name, interval_steps):
 
 def main():
     """Main function to train and evaluate models for each interval."""
-    spy_data = load_data()
+    spy_data = create_year_of_15min_data()  # Use external function to create a year of 15-minute data
     spy_data = preprocess_data(spy_data)
 
     # Loop over adjusted intervals based on market hours
