@@ -1,3 +1,4 @@
+import os
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, ExtraTreesRegressor
 from xgboost import XGBRegressor
 from catboost import CatBoostRegressor
@@ -5,8 +6,9 @@ from sklearn.linear_model import Ridge
 import tensorflow as tf
 import json
 
-# Load config
-with open('config.json', 'r') as f:
+# Set the path to config.json based on the current file's location
+config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+with open(config_path, 'r') as f:
     config = json.load(f)
 
 def build_lstm(sequence_length, feature_count):

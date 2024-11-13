@@ -18,6 +18,13 @@
         "96h": 384,
         "168h": 672
     },
+    "intervals_market_hours": {
+        "24h": 26,
+        "48h": 52,
+        "72h": 78,
+        "96h": 104,
+        "168h": 182
+    },
     "model_params": {
         "RandomForestRegressor": {
             "n_estimators": 200,

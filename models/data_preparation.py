@@ -1,12 +1,15 @@
+import os
 import pickle
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 import json
 
-# Load config
-with open('config.json', 'r') as f:
+# Set the path to config.json based on the current file's location
+config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+with open(config_path, 'r') as f:
     config = json.load(f)
+
 
 def load_data():
     """Load and preprocess data from pickle file."""
