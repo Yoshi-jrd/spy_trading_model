@@ -1,6 +1,7 @@
 import os
 import sys
 import pickle
+import json
 from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import pandas as pd
@@ -8,6 +9,40 @@ from sklearn.model_selection import train_test_split
 from data.market_data_loader import load_spy_multi_timeframes, get_vix_futures, get_all_iv
 from data.economic_data_loader import load_economic_data
 from data.sentiment_data_loader import get_news_sentiment
+
+# Set the path to config.json based on the current file's location
+config_path = os.path.join(os.path.dirname(__file__), '../models/config.json')
+with open(config_path, 'r') as f:
+    config = json.load(f)
+
+def load_data(interval):
+    """
+    Loads SPY time series data for a specified interval from a pickle file.
+
+    Parameters:
+    - interval: String representing the time interval ('15min', '1hr', or '1d').
+
+    Returns:
+    - DataFrame with the specified interval data.
+    """
+    # Load the data from the pickle file
+    with open(config['paths']['historical_data'], 'rb') as f:
+        data = pickle.load(f)
+    
+    # Retrieve and return data based on interval
+    if interval == '15min':
+        spy_data = data['spy_data']['15m']
+    elif interval == '1hr':
+        spy_data = data['spy_data']['1h']
+    elif interval == '1d':
+        spy_data = data['spy_data']['1d']
+    else:
+        raise ValueError("Invalid interval specified. Use '15min', '1hr', or '1d'.")
+
+    # Ensure datetime consistency
+    spy_data = spy_data.rename(columns={'datetime': 'datetime'}).set_index('datetime')
+
+    return spy_data
 
 def import_data():
     """

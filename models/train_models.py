@@ -1,13 +1,13 @@
+# train_models.py
 import os
 import logging
 import numpy as np
 import json
-from data_preparation import load_data, preprocess_data, prepare_lstm_data
+from data_processing.data_augmentation import create_year_of_15min_data  # Directly import the 15-min data generator
 from model_definitions import build_lstm, build_random_forest, build_gradient_boosting, build_xgboost, build_extra_trees, build_catboost, build_ridge
 from evaluate_model import evaluate_model
-from dynamic_weight_optimizer import optimize_weights
+from data_preparation import prepare_lstm_data
 import matplotlib.pyplot as plt
-from data_processing.data_augmentation import create_year_of_15min_data  # New import
 
 # Set the path to config.json based on the current file's location
 config_path = os.path.join(os.path.dirname(__file__), 'config.json')
@@ -19,14 +19,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 def plot_predictions_vs_actual(predictions, actual_prices, interval_name):
-    """
-    Plot model predictions against actual SPY prices for verification.
-
-    Parameters:
-    - predictions: Array of predicted prices from the model.
-    - actual_prices: Array of actual SPY prices for the same intervals.
-    - interval_name: String representing the prediction interval (e.g., "24h").
-    """
+    """Plot model predictions against actual SPY prices for verification."""
     plt.figure(figsize=(10, 5))
     plt.plot(actual_prices, label='Actual Prices', color='blue')
     plt.plot(predictions, label='Predicted Prices', color='red')
@@ -38,7 +31,6 @@ def plot_predictions_vs_actual(predictions, actual_prices, interval_name):
 
 def train_and_stack_models(spy_data, interval_name, interval_steps):
     """Trains and stacks models with LSTM for the specified interval with adjusted market hours."""
-    # Prepare LSTM data with adjusted interval steps
     X_train_seq, y_train_seq, close_scaler = prepare_lstm_data(spy_data, interval_steps=interval_steps)
 
     # Build and train LSTM model
@@ -78,20 +70,54 @@ def train_and_stack_models(spy_data, interval_name, interval_steps):
     mae, rmse, avg_diff = evaluate_model(y_train_seq, stacked_predictions)
     logger.info(f"{interval_name} - MAE: {mae}, RMSE: {rmse}, Avg Difference: {avg_diff}")
 
-    return stacked_predictions, y_train_seq
+    # Return all trained models and close_scaler for future use in testing
+    return (ridge_meta_model, lstm_model, rf_model, gb_model, xgb_model, et_model, cb_model), close_scaler
+
+def predict_with_models(models, X_test_seq, close_scaler):
+    """Uses trained models to make predictions on the test set."""
+    ridge_meta_model, lstm_model, rf_model, gb_model, xgb_model, et_model, cb_model = models
+
+    # Make predictions with each model
+    lstm_predictions = lstm_model.predict(X_test_seq)
+    X_test_2d = X_test_seq[:, -1, :]  # Extract last timestep
+
+    base_predictions = [
+        rf_model.predict(X_test_2d),
+        gb_model.predict(X_test_2d),
+        xgb_model.predict(X_test_2d),
+        et_model.predict(X_test_2d),
+        cb_model.predict(X_test_2d),
+        lstm_predictions.flatten()
+    ]
+    predictions_matrix = np.column_stack(base_predictions)
+
+    # Final stacked prediction using Ridge meta-model
+    stacked_predictions = ridge_meta_model.predict(predictions_matrix)
+    return close_scaler.inverse_transform(stacked_predictions.reshape(-1, 1)).flatten()
 
 def main():
-    """Main function to train and evaluate models for each interval."""
-    spy_data = create_year_of_15min_data()  # Use external function to create a year of 15-minute data
-    spy_data = preprocess_data(spy_data)
+    """Main function to train and evaluate models for each interval with out-of-sequence testing."""
+    # Generate and preprocess the full 15-minute SPY data
+    spy_data = create_year_of_15min_data()
 
-    # Loop over adjusted intervals based on market hours
+    # Split data into training (first 9 months) and testing (last 3 months)
+    split_point = int(len(spy_data) * 0.75)
+    spy_train_data = spy_data.iloc[:split_point]
+    spy_test_data = spy_data.iloc[split_point:]
+
+    # Train models on the training set for each interval
     for interval_name, interval_steps in config['intervals_market_hours'].items():
         logger.info(f"Training for interval: {interval_name} with steps: {interval_steps}")
-        predictions, actual_prices = train_and_stack_models(spy_data, interval_name, interval_steps)
+        
+        # Correctly unpack trained models and scaler
+        trained_models, close_scaler = train_and_stack_models(spy_train_data, interval_name, interval_steps)
 
-        # Plot predictions vs actual prices for verification
-        plot_predictions_vs_actual(predictions, actual_prices, interval_name)
+        # Prepare the test data
+        X_test_seq, y_test_seq, _ = prepare_lstm_data(spy_test_data, interval_steps=interval_steps)
+
+        # Predict and plot for the test set
+        test_predictions = predict_with_models(trained_models, X_test_seq, close_scaler)
+        plot_predictions_vs_actual(test_predictions, close_scaler.inverse_transform(y_test_seq).flatten(), f"{interval_name} Testing")
 
 if __name__ == "__main__":
     main()
